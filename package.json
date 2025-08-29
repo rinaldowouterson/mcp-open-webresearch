@@ -1,6 +1,6 @@
 {
-  "name": "open-websearch",
-  "version": "1.1.5",
+  "name": "mcp-open-websearch",
+  "version": "0.0.1",
   "description": "web search the internet",
   "type": "module",
   "bin": {
@@ -14,25 +14,31 @@
     "watch": "tsc --watch",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
     "start": "node build/index.js",
-    "dev": "tsc && node build/index.js"
+    "start:proxy": "./launch-proxy.sh",
+    "test": "vitest run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.11.2",
     "@types/axios": "^0.14.4",
     "@types/cheerio": "^0.22.35",
+    "@types/node": "^24.3.0",
+    "@types/turndown": "^5.0.5",
     "axios": "^1.7.9",
     "cheerio": "^1.0.0",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
     "express": "^4.18.2",
     "https-proxy-agent": "^7.0.6",
     "jsdom": "^26.1.0",
-    "npx": "^10.2.2"
+    "playwright": "^1.54.1",
+    "socks-proxy-agent": "^8.0.5",
+    "turndown": "^7.2.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
     "@types/jsdom": "^21.1.7",
-    "@types/node": "^20.17.10",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.2.4"
   }
 }
