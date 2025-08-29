@@ -1,11 +1,11 @@
-import { searchDuckDuckGo } from '../engines/duckduckgo/index.js';
+import { searchDuckDuckGo } from "../engines/duckduckgo/index.js";
 
 async function testDuckDuckGoSearch() {
-  console.log('🔍 Starting DuckDuckGo search test...');
+  console.log("🔍 Starting DuckDuckGo search test...");
 
   try {
     // const query = 'site:zhuanlan.zhihu.com websearch mcp';
-    const query = 'site:linux.do websearch mcp';
+    const query = "site:github.com websearch mcp";
     const maxResults = 30;
 
     console.log(`📝 Search query: ${query}`);
@@ -23,7 +23,7 @@ async function testDuckDuckGoSearch() {
 
     return results;
   } catch (error) {
-    console.error('❌ Test failed:', error);
+    console.error("❌ Test failed:", error);
     return [];
   }
 }
