@@ -1,1 +1,1 @@
-export { searchBing } from './bing.js';
+export { searchBing } from "./bing.js";
