@@ -1,6 +1,9 @@
 #!/usr/bin/env node
+import "dotenv/config"; // Load environment variables from .env file
+import { captureConsoleDebug, closeWritingStream } from "./utils/logger.js";
+captureConsoleDebug();
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { setupTools } from "./server/initializer.js";
+import { serverInitializer } from "./server/initializer.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -8,53 +11,70 @@ import express from "express";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
 import cors from "cors";
-import { config } from "./config.js";
+import { loadConfig } from "./config/loader.js";
+
+import { cleanBrowserSession } from "./engines/visit_page/visit.js";
+
+process.on("SIGTERM", async () => {
+  console.debug("Received SIGTERM (VSCode closing), cleaning session...");
+  await cleanBrowserSession();
+  await closeWritingStream();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  console.debug("Received SIGINT (Ctrl+C), cleaning session...");
+  await cleanBrowserSession();
+  await closeWritingStream();
+  process.exit(0);
+});
+
+process.on("SIGHUP", async () => {
+  console.debug(
+    "Received SIGHUP (terminal session ending), cleaning session..."
+  );
+  await cleanBrowserSession();
+  await closeWritingStream();
+  process.exit(0);
+});
 
 async function main() {
-  // 创建 Express 应用
   const app = express();
 
-  const server = new McpServer({
+  const mcpServer = new McpServer({
     name: "web-search",
-    version: "1.1.5",
+    version: "1.1",
   });
 
-  // ... set up server resources, tools, and prompts ...
-  setupTools(server);
+  serverInitializer(mcpServer);
+
   app.use(express.json());
 
-  // 是否启用跨域
-  if (config.enableCors) {
+  if (loadConfig().enableCors) {
     app.use(
       cors({
-        origin: config.corsOrigin || "*",
+        origin: loadConfig().corsOrigin || "*",
         methods: ["GET", "POST", "DELETE"],
       })
     );
     app.options("*", cors());
   }
 
-  // Store transports for each session type
   const transports = {
     streamable: {} as Record<string, StreamableHTTPServerTransport>,
     sse: {} as Record<string, SSEServerTransport>,
   };
 
-  // Handle POST requests for client-to-server communication
   app.post("/mcp", async (req, res) => {
-    // Check for existing session ID
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     let transport: StreamableHTTPServerTransport;
 
     if (sessionId && transports.streamable[sessionId]) {
-      // Reuse existing transport
       transport = transports.streamable[sessionId];
     } else if (!sessionId && isInitializeRequest(req.body)) {
-      // New initialization request
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sessionId) => {
-          // Store the transport by session ID
           transports.streamable[sessionId] = transport;
         },
         // DNS rebinding protection is disabled by default for backwards compatibility. If you are running this server
@@ -63,17 +83,14 @@ async function main() {
         // allowedHosts: ['127.0.0.1'],
       });
 
-      // Clean up transport when closed
       transport.onclose = () => {
         if (transport.sessionId) {
           delete transports.streamable[transport.sessionId];
         }
       };
 
-      // Connect to the MCP server
-      await server.connect(transport);
+      await mcpServer.connect(transport);
     } else {
-      // Invalid request
       res.status(400).json({
         jsonrpc: "2.0",
         error: {
@@ -85,11 +102,9 @@ async function main() {
       return;
     }
 
-    // Handle the request
     await transport.handleRequest(req, res, req.body);
   });
 
-  // Reusable handler for GET and DELETE requests
   const handleSessionRequest = async (
     req: express.Request,
     res: express.Response
@@ -104,15 +119,12 @@ async function main() {
     await transport.handleRequest(req, res);
   };
 
-  // Handle GET requests for server-to-client notifications via SSE
   app.get("/mcp", handleSessionRequest);
 
-  // Handle DELETE requests for session termination
   app.delete("/mcp", handleSessionRequest);
 
   // Legacy SSE endpoint for older clients
   app.get("/sse", async (req, res) => {
-    // Create SSE transport for legacy clients
     const transport = new SSEServerTransport("/messages", res);
     transports.sse[transport.sessionId] = transport;
 
@@ -120,7 +132,7 @@ async function main() {
       delete transports.sse[transport.sessionId];
     });
 
-    await server.connect(transport);
+    await mcpServer.connect(transport);
   });
 
   // Legacy message endpoint for older clients
@@ -134,20 +146,21 @@ async function main() {
     }
   });
 
-  // Read the port number from the environment variable; use the default port 3000 if it is not set.
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-  // Studio/IDE integration via stdio
   const transport = new StdioServerTransport();
-  await server
+  await mcpServer
     .connect(transport)
     .then(() => {
-      console.log("STDIO Transport enabled");
+      console.debug("STDIO Transport enabled");
     })
     .catch(console.error);
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.debug(`Server is running on port ${PORT}`);
   });
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error("Fatal error:", error);
+  process.exit(1);
+});
