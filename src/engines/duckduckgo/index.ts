@@ -1,1 +1,1 @@
-export { searchDuckDuckGo } from './searchDuckDuckGo.js';
+export { searchDuckDuckGo } from "./duckduckgo.js";

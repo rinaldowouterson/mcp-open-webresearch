@@ -1,130 +1,129 @@
-// tools/setupTools.ts
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { searchBing } from "../engines/bing/index.js";
-import { SearchResult } from "../types.js";
+import { visitPage } from "../engines/visit_page/visit.js";
 import { z } from "zod";
-import { searchDuckDuckGo } from "../engines/duckduckgo/index.js";
-import { searchBrave } from "../engines/brave/index.js";
+import { loadConfig } from "../config/loader.js";
+import { SUPPORTED_ENGINES } from "../types/index.js";
+import { executeMultiEngineSearch } from "./helpers/executeMultiEngineSearch.js";
+import { updateDefaultSearchEngines } from "./helpers/updateDefaultSearchEngines.js";
+import { createResponse } from "./helpers/createResponse.js";
 
-// 支持的搜索引擎
-const SUPPORTED_ENGINES = ["bing", "duckduckgo", "brave"] as const;
-type SupportedEngine = (typeof SUPPORTED_ENGINES)[number];
-
-// 搜索引擎调用函数映射
-const engineMap: Record<
-  any,
-  (query: string, limit: number) => Promise<SearchResult[]>
-> = {
-  bing: searchBing,
-  duckduckgo: searchDuckDuckGo,
-  brave: searchBrave,
-};
-
-// 分配搜索结果数量
-const distributeLimit = (totalLimit: number, engineCount: number): number[] => {
-  const base = Math.floor(totalLimit / engineCount);
-  const remainder = totalLimit % engineCount;
-
-  return Array.from(
-    { length: engineCount },
-    (_, i) => base + (i < remainder ? 1 : 0)
-  );
-};
-
-// 执行搜索
-const executeSearch = async (
-  query: string,
-  engines: string[],
-  limit: number
-): Promise<SearchResult[]> => {
-  // Clean up the query string to ensure it won't cause issues due to spaces or special characters
-  const cleanQuery = query.trim();
-  console.log(
-    `[DEBUG] Executing search, query: "${cleanQuery}", engines: ${engines.join(
-      ", "
-    )}, limit: ${limit}`
-  );
-
-  if (!cleanQuery) {
-    console.error("Query string is empty");
-    throw new Error("Query string cannot be empty");
-  }
-
-  const limits = distributeLimit(limit, engines.length);
-
-  const searchTasks = engines.map((engine, index) => {
-    const engineLimit = limits[index];
-    const searchFn = engineMap[engine as SupportedEngine];
-
-    if (!searchFn) {
-      console.warn(`Unsupported search engine: ${engine}`);
-      return Promise.resolve([]);
-    }
-
-    return searchFn(query, engineLimit).catch((error) => {
-      console.error(`Search failed for engine ${engine}:`, error);
-      return [];
-    });
-  });
-
-  try {
-    const results = await Promise.all(searchTasks);
-    return results.flat().slice(0, limit);
-  } catch (error) {
-    console.error("Search execution failed:", error);
-    throw error;
-  }
-};
-
-export const setupTools = (server: McpServer): void => {
-  // 搜索工具
+export const serverInitializer = (server: McpServer): void => {
+  // Tool: Update default search engines
   server.tool(
-    "search",
-    "Search the web using multiple engines (e.g., Bing, DuckDuckGo, Brave) with no API key required",
+    "update_default",
+    "Update default search engines and persist to .env",
     {
-      query: z.string().min(1, "Search query must not be empty"),
-      limit: z.number().min(1).max(50).default(10),
-      engines: z.array(z.enum(["bing", "duckduckgo", "brave"])).min(1),
-      // .default([config.defaultSearchEngine]),
+      engines: z
+        .array(z.enum(SUPPORTED_ENGINES))
+        .min(1)
+        .describe("Comma-separated list of search engines to set as default"),
     },
-    async ({ query, limit = 10, engines = ["bing"] }) => {
+    async ({ engines }) => {
+      return await updateDefaultSearchEngines(engines);
+    }
+  );
+
+  // Tool: Check current defaults
+  server.tool(
+    "check_default",
+    "Check currently configured default search engines",
+    {},
+    async () => {
+      return createResponse(
+        JSON.stringify(
+          { defaultEngines: loadConfig().defaultSearchEngines },
+          null,
+          2
+        )
+      );
+    }
+  );
+
+  // Tool: Web search
+  server.tool(
+    "search_web",
+    "Search the web using multiple engines",
+    {
+      query: z
+        .string()
+        .min(1, "Search query must not be empty")
+        .describe("Search query string"),
+      max_results: z
+        .number()
+        .min(1)
+        .max(50)
+        .default(10)
+        .describe("Maximum number of results to return"),
+      engines: z
+        .array(z.enum(SUPPORTED_ENGINES))
+        .min(1)
+        .optional()
+        .describe("Engines to use (default: current configuration)"),
+    },
+    async ({ query, max_results = 10, engines }) => {
       try {
-        console.log(
-          `Searching for "${query}" using engines: ${engines.join(", ")}`
+        // Use provided engines or fall back to configured defaults
+        const enginesToUse = engines?.length
+          ? engines
+          : loadConfig().defaultSearchEngines;
+
+        const results = await executeMultiEngineSearch(
+          query,
+          enginesToUse,
+          max_results
         );
 
-        const results = await executeSearch(query.trim(), engines, limit);
-
-        return {
-          content: [
+        return createResponse(
+          JSON.stringify(
             {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  query: query.trim(),
-                  engines: engines,
-                  totalResults: results.length,
-                  results: results,
-                },
-                null,
-                2
-              ),
+              query: query.trim(),
+              engines: enginesToUse,
+              total_results: results.length,
+              results,
             },
-          ],
-        };
+            null,
+            2
+          )
+        );
       } catch (error) {
-        console.error("Search tool execution failed:", error);
-        return {
-          content: [
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        return createResponse(`Search failed: ${errorMessage}`, true);
+      }
+    }
+  );
+
+  // Tool: Visit webpage
+  server.tool(
+    "visit_webpage",
+    "Visit a webpage and extract its content",
+    {
+      url: z.string().url().describe("URL of the page to visit"),
+      capture_screenshot: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Whether to capture a screenshot"),
+    },
+    async ({ url, capture_screenshot }) => {
+      try {
+        const result = await visitPage(url, capture_screenshot);
+        return createResponse(
+          JSON.stringify(
             {
-              type: "text",
-              text: `Search failed: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`,
+              url: result.url,
+              title: result.title,
+              content: result.content,
+              screenshot_path: result.screenshotPath,
             },
-          ],
-          isError: true,
-        };
+            null,
+            2
+          )
+        );
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        return createResponse(`Page visit failed: ${errorMessage}`, true);
       }
     }
   );

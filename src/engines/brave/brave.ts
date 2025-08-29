@@ -1,95 +1,95 @@
-import axios from 'axios';
-import * as cheerio from 'cheerio';
-import { SearchResult } from '../../types.js';
-import {getProxyUrl} from "../../config.js";
-import {HttpsProxyAgent} from "https-proxy-agent";
+import { fetchBravePage } from "../fetch/index.js";
+import * as cheerio from "cheerio";
+import { SearchResult } from "../../types/search.js";
 
-export async function searchBrave(query: string, limit: number): Promise<SearchResult[]> {
-    let allResults: SearchResult[] = [];
-    let pn = 0;
-    // use the proxy from environment variables
-    const effectiveProxyUrl = getProxyUrl();
+const MAX_PAGES = 10;
+const RESULTS_PER_PAGE = 10;
 
-    // Configure request options
-    const requestOptions: any = {
-        headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
-            "Connection": "keep-alive",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-            "Accept-Encoding": "gzip, deflate, br",
-            "sec-ch-ua": "\"Chromium\";v=\"112\", \"Google Chrome\";v=\"112\", \"Not:A-Brand\";v=\"99\"",
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": "\"Windows\"",
-            "upgrade-insecure-requests": "1",
-            "sec-fetch-site": "same-origin",
-            "sec-fetch-mode": "navigate",
-            "sec-fetch-user": "?1",
-            "sec-fetch-dest": "document",
-            "referer": "https://duckduckgo.com/",
-            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8"
-        }
-    };
+/**
+ * Extracts search results from Brave HTML content
+ * @param $ Cheerio root instance
+ * @returns Array of parsed search results
+ */
+function parseResults($: cheerio.Root): SearchResult[] {
+  const resultsContainer = $("#results");
 
-    // If a proxy URL is provided, use it
-    if (effectiveProxyUrl) {
-        const proxyAgent = new HttpsProxyAgent(effectiveProxyUrl);
-        requestOptions.httpAgent = proxyAgent;
-        requestOptions.httpsAgent = proxyAgent;
+  return resultsContainer
+    .find(".snippet")
+    .map((index, element) => {
+      const resultElement = $(element);
+
+      const title = resultElement.find(".title").text().trim();
+      const url = resultElement.find("a.heading-serpresult").attr("href");
+
+      if (!url || !url.startsWith("http")) {
+        return null;
+      }
+
+      const description = resultElement
+        .find(".snippet-description")
+        .text()
+        .trim();
+
+      const source = resultElement.find(".sitename").text().trim();
+
+      return {
+        title,
+        url,
+        description,
+        source,
+        engine: "brave",
+      };
+    })
+    .get()
+    .filter(Boolean) as SearchResult[];
+}
+
+/**
+ * Executes Brave search with proper pagination and error handling
+ * @param query Search query
+ * @param limit Maximum results to return
+ * @returns Array of search results
+ */
+export async function searchBrave(
+  query: string,
+  limit: number
+): Promise<SearchResult[]> {
+  const results: SearchResult[] = [];
+
+  for (let page = 0; page < MAX_PAGES && results.length < limit; page++) {
+    try {
+      const offset = page * RESULTS_PER_PAGE;
+      const html = await fetchBravePage(query, offset);
+      const $ = cheerio.load(html);
+      const pageResults = parseResults($);
+
+      if (pageResults.length === 0 && results.length === 0) {
+        return [
+          {
+            title: "No results found",
+            url: "",
+            description: "Your search didn't return any results",
+            source: "brave",
+            engine: "brave",
+          },
+        ];
+      }
+
+      results.push(...pageResults);
+
+      if (pageResults.length === 0) {
+        break;
+      }
+    } catch (error) {
+      console.error(`Error fetching Brave page ${page + 1}:`, error);
+
+      if (results.length > 0) {
+        return results.slice(0, limit);
+      }
+
+      throw error;
     }
+  }
 
-    const encodedQuery = encodeURIComponent(query);
-    while (allResults.length < limit) {
-        const response = await axios.get(`https://search.brave.com/search?q=${encodedQuery}&source=web&offset=${pn}`, requestOptions)
-
-        const $ = cheerio.load(response.data);
-        const results: SearchResult[] = [];
-
-
-        // Select the main container for all search results
-        const resultsContainer = $('#results');
-
-        // Find each result snippet within the container
-        resultsContainer.find('.snippet').each((index, element) => {
-            const resultElement = $(element);
-
-            // Extract the title
-            const titleElement = resultElement.find('.title');
-            const title = titleElement.text().trim();
-
-            // Extract the URL from the main link
-            const linkElement = resultElement.find('a.heading-serpresult');
-            const url = linkElement.attr('href');
-
-            // Extract the description/snippet
-            const snippetElement = resultElement.find('.snippet-description');
-            const description = snippetElement.text().trim() || '';
-
-            // Extract the source/sitename
-            const sourceElement = resultElement.find('.sitename');
-            const source = sourceElement.text().trim() || '';
-
-            // Ensure that we have a valid title and URL before adding
-            if (title && url) {
-                results.push({
-                    title: title,
-                    url: url,
-                    description: description,
-                    source: source,
-                    engine: 'bing'
-                });
-            }
-        });
-
-
-        allResults = allResults.concat(results);
-
-        if (results.length === 0) {
-            console.log('⚠️ No more results, ending early....');
-            break;
-        }
-
-        pn += 1;
-    }
-
-    return allResults.slice(0, limit); // 截取最多 limit 个
+  return results.slice(0, limit);
 }
