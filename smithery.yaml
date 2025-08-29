@@ -18,7 +18,7 @@ startCommand:
       defaultSearchEngine:
         type: string
         default: duckduckgo
-        description: Default search engine (bing, baidu, duckduckgo, exa, brave, juejin)
+        description: Default search engine (bing, duckduckgo, brave)
       useProxy:
         type: boolean
         default: false
