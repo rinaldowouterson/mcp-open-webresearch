@@ -65,7 +65,7 @@ describe("createLaunchOptionsForPlayWright", () => {
     // Check if the debug calls contain the expected messages
     expect(debugCalls).toContain("visit: config.proxy.enabled: false");
     expect(debugCalls.some(call => 
-      typeof call === 'string' && call.includes('visit: the current config is')
+      typeof call === 'string' && call.includes('visit: config.proxy.enabled:')
     )).toBe(true);
   });
 
