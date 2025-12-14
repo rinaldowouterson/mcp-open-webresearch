@@ -208,6 +208,14 @@ Returns the currently configured default search engines.
 
 ---
 
+## Roadmap
+
+- [ ] **Context Pollution Prevention**: Implement sampling to further process search results, investigating and aggregating only high-quality results to prevent polluting the LLM context.
+- [ ] **Brave Rate Limiting**: Introduce a 5-second timeout/cooldown for Brave to evade rate limits. If a request is made within this window, the engine will temporarily skip Brave and rely on Bing and DuckDuckGo.
+- [ ] **Keyless GitHub Adapter**: Implement a specialized adapter for fetching GitHub content without requiring API tokens.
+
+---
+
 ## License
 
 This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
