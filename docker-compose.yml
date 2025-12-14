@@ -1,10 +1,10 @@
 services:
-  mcp-open-webresearch:
-    image: mcp-open-webresearch-single
+  production:
+    image: mcp-open-webresearch:latest
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mcp-open-webresearch-single
+    container_name: mcp-production
     working_dir: /app
     restart: unless-stopped
     ports:
