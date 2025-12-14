@@ -17,14 +17,14 @@ WORKDIR /app
 # Copy package files for caching
 COPY package*.json ./
 # Install all deps (incl. dev) for build
-RUN npm ci && npm cache clean --force
+RUN npm ci --ignore-scripts && npm cache clean --force
 
 # Copy source and build TS to JS
 COPY . .
 RUN npm run build
 
 # Prune to prod deps only
-RUN rm -rf node_modules && npm ci --omit=dev && npm cache clean --force
+RUN rm -rf node_modules && npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Stage 2: Runtime - Alpine Node with prod artifacts and Chromium install
 FROM node:24-alpine
@@ -38,6 +38,8 @@ RUN apk add --no-cache \
     gosu \
     tini \
     chromium \
+    nss-tools \
+    openssl \
     && rm -rf /var/cache/apk/* /tmp/* /var/tmp/* /usr/local/share/.cache /root/.npm /root/.cache
 
 # Create cert dirs
@@ -52,6 +54,7 @@ COPY --from=builder /app/docker_launcher.sh ./launcher.sh
 
 ENV PLAYWRIGHT_BROWSERS_PATH=0
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true
+ENV CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Create non-root user
 # RUN addgroup -g 1000 node && \

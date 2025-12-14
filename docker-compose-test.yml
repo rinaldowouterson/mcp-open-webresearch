@@ -1,9 +1,10 @@
 services:
-  mcp-open-webresearch-test:
+  test:
+    image: mcp-open-webresearch:test
     build:
       context: .
       dockerfile: Dockerfile_Test
-    container_name: mcp-open-webresearch-test
+    container_name: mcp-test
     working_dir: /app
     environment:
       - NODE_USE_SYSTEM_CA=1

@@ -23,6 +23,28 @@ err() { log ERROR "$1"; }
 
     export DOCKER_ENVIRONMENT=true
 
+    # Validate Chromium executable from ENV
+    if [[ -z "${CHROMIUM_EXECUTABLE_PATH:-}" ]]; then
+        # If not set, try to detect standard locations for logging/fallback (but prefer fixed ENV)
+        if [[ -f "/usr/bin/chromium" ]]; then
+            warn "CHROMIUM_EXECUTABLE_PATH not set, defaulting to /usr/bin/chromium"
+            export CHROMIUM_EXECUTABLE_PATH="/usr/bin/chromium"
+        elif [[ -f "/usr/bin/chromium-browser" ]]; then
+            warn "CHROMIUM_EXECUTABLE_PATH not set, defaulting to /usr/bin/chromium-browser"
+            export CHROMIUM_EXECUTABLE_PATH="/usr/bin/chromium-browser"
+        else
+            err "CHROMIUM_EXECUTABLE_PATH not set and no chromium found in standard paths"
+            exit 1
+        fi
+    fi
+
+    if [[ ! -f "$CHROMIUM_EXECUTABLE_PATH" ]]; then
+         err "Chromium not found at $CHROMIUM_EXECUTABLE_PATH"
+         exit 1
+    fi
+     
+    info "Using Chromium at: $CHROMIUM_EXECUTABLE_PATH"
+
     info "Configuration: USE_PROXY==> $USE_PROXY |____| DRY_RUN==> $DRY_RUN"
 
     # If not using proxy, we can skip all certificate validation and run node directly
@@ -112,6 +134,22 @@ ensure_variable_not_empty() {
         if grep -q "Test CA" /etc/ssl/certs/ca-certificates.crt 2>/dev/null; then
              info "Confirmed 'Test CA' is present in system bundle"
         fi
+
+        # Update Chromium's NSS Database (required for it to trust the System CA)
+        info "Updating Chromium NSS Database for user 'node'..."
+        mkdir -p /home/node/.pki/nssdb
+        certutil -d sql:/home/node/.pki/nssdb -N --empty-password
+        
+        for cert in /usr/local/share/ca-certificates/*.crt; do
+            [ -e "$cert" ] || continue
+            cert_name=$(basename "$cert")
+            info "Importing $cert_name into NSS DB"
+            certutil -d sql:/home/node/.pki/nssdb -A -t "C,," -n "$cert_name" -i "$cert"
+        done
+        
+        # Fix ownership so the node user can read it
+        chown -R node:node /home/node/.pki
+        info "Chromium NSS Database updated."
     else
         err "Failed to update CA trust store. Check certificate formats."
         exit 1
