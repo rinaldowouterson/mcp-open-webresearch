@@ -20,11 +20,11 @@ describe("isValidUrl", () => {
   });
 
   test("validates SOCKS4A URL", () => {
-    expect(isValidUrl("socks4a://proxy:1080")).toBe(true);
+    expect(isValidUrl("socks4a://proxy:1080")).toBe(false);
   });
 
   test("validates SOCKS4 URL", () => {
-    expect(isValidUrl("socks4://proxy:1080")).toBe(true);
+    expect(isValidUrl("socks4://proxy:1080")).toBe(false);
   });
 
   test("rejects invalid protocol", () => {

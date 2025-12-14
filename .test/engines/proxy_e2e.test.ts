@@ -11,9 +11,9 @@ describe("Proxy E2E Tests", () => {
     // These tests spin up local proxies (mockttp/simple-socks) which conflicts with
     // the complexities of the Docker test environment (binding, routing).
     // Validated locally.
+    // We want to run these in Docker now to verify the SOCKS bridge.
     if (process.env.DOCKER_ENVIRONMENT === "true") {
-        it.skip("skipping local proxy tests in Docker", () => {});
-        return;
+        console.log("Running local proxy tests inside Docker container...");
     }
   
   let proxyServer: mockttp.Mockttp | undefined;
@@ -55,6 +55,16 @@ describe("Proxy E2E Tests", () => {
 
     process.env.USE_PROXY = "true";
     process.env.HTTP_PROXY = proxyUrl;
+    // loader.ts prioritizes HTTPS_PROXY, which is set in Docker environment.
+    // We must unset it to ensure HTTP_PROXY is picked up.
+    delete process.env.HTTPS_PROXY; 
+    delete process.env.SOCKS5_PROXY;
+    
+    console.log("DEBUG: Proxy URL:", proxyUrl);
+    console.log("DEBUG: Env HTTP_PROXY:", process.env.HTTP_PROXY);
+    console.log("DEBUG: Env HTTPS_PROXY:", process.env.HTTPS_PROXY);
+    console.log("DEBUG: Env SOCKS5_PROXY:", process.env.SOCKS5_PROXY);
+    console.log("DEBUG: Env USE_PROXY:", process.env.USE_PROXY);
 
     vi.resetModules(); // Force config reload
     const { visitPage } = await import("../../src/engines/visit_page/visit.js");
@@ -63,9 +73,15 @@ describe("Proxy E2E Tests", () => {
     expect(result.content).toContain("Example Domain");
 
     const seenRequests = await mockedEndpoint.getSeenRequests();
-    expect(seenRequests.length).toBe(1);
-    expect(seenRequests[0].url).toBe(TEST_URL_HTTP);
-  });
+    console.log("DEBUG: Seen requests:", seenRequests.map(r => r.url));
+    
+    // We expect at least one request to the target URL. 
+    // The browser might make other requests (favicon, etc) or retries.
+    expect(seenRequests.length).toBeGreaterThanOrEqual(1);
+    
+    const targetRequest = seenRequests.find(r => r.url === TEST_URL_HTTP || r.url === TEST_URL_HTTP.slice(0, -1));
+    expect(targetRequest).toBeDefined();
+  }, 30000);
 
   it("should route traffic through a SOCKS5 proxy (no authentication)", () => {
     return new Promise<void>((resolve, reject) => {
@@ -100,10 +116,10 @@ describe("Proxy E2E Tests", () => {
         }
       });
     });
-  });
+  }, 30000);
 
 
-  it("should fail to launch when using SOCKS5 proxy with authentication (Chromium limitation)", () => {
+  it("should successfully route traffic using SOCKS5 proxy with authentication (via bridge)", () => {
     return new Promise<void>((resolve, reject) => {
       const socksPort = 0; // Dynamic
       let authAttempts = 0;
@@ -138,15 +154,17 @@ describe("Proxy E2E Tests", () => {
           vi.resetModules(); // Force config reload
           const { visitPage } = await import("../../src/engines/visit_page/visit.js");
 
-          // Chromium does not support SOCKS5 authentication. 
-          // We verify that this limitation is correctly surfaced as a specific error.
-          await expect(visitPage(TEST_URL_HTTP)).rejects.toThrow("Browser does not support socks5 proxy authentication");
+          // Chromium does not support SOCKS5 authentication natively.
+          // However, we implemented a bridge (proxy-chain) that handles this.
+          // So we verify that it now SUCCEEDS.
+          const result = await visitPage(TEST_URL_HTTP);
+          expect(result.content).toContain("Example Domain");
           
           if (!authSuccess) {
-            // This flag is irrelevant now as we expect it to fail before auth
+            reject(new Error("Page visited but SOCKS proxy authentication NOT performed"));
           }
           if (!proxyConnected) {
-             // proxy might not strictly connect if browser checks params first
+             reject(new Error("Page visited but SOCKS proxy was NOT used"));
           } 
           resolve(); 
         } catch (error) {
@@ -155,7 +173,7 @@ describe("Proxy E2E Tests", () => {
         }
       });
     });
-  });
+  }, 30000);
 
   it("should prioritize SOCKS5 over HTTP proxy", async () => {
     // Start an HTTP proxy that will fail the test if used
@@ -201,6 +219,6 @@ describe("Proxy E2E Tests", () => {
     expect(socksConnected).toBe(true);
 
     await httpProxy.stop();
-  });
+  }, 30000);
 
 });

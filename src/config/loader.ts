@@ -7,7 +7,7 @@ import {
   ProxyAgent,
 } from "../types/app-config.js";
 
-const PROTOCOL_PATTERN = /^(https?|socks4a?|socks5):\/\//i;
+const PROTOCOL_PATTERN = /^(https?|socks5):\/\//i;
 
 export const urlSeemsValid = (url: string): boolean => {
   const emptyUrl = url.trim().length === 0;
@@ -18,8 +18,6 @@ export const urlSeemsValid = (url: string): boolean => {
 const loadProxyConfig = (): ProxyConfig => {
   const proxyUrl =
     process.env.SOCKS5_PROXY ||
-    process.env.SOCKS4A_PROXY ||
-    process.env.SOCKS4_PROXY ||
     process.env.HTTPS_PROXY ||
     process.env.HTTP_PROXY ||
     "";

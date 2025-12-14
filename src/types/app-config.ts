@@ -5,8 +5,6 @@ export type ProxyProtocol =
   | "http"
   | "https"
   | "socks5"
-  | "socks4a"
-  | "socks4"
   | null;
 
 export type ProxyAgent = {

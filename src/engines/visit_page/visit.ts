@@ -6,6 +6,7 @@ import * as path from "path";
 import * as os from "os";
 import { isValidBrowserUrl } from "../../utils/isValidUrl.js";
 import { loadConfig } from "../../config/loader.js";
+import { startProxyBridge, stopProxyBridge } from "../../utils/proxy_bridge.js";
 
 const SCREENSHOTS_DIR = fs.mkdtempSync(
   path.join(os.tmpdir(), "mcp-screenshots-")
@@ -58,6 +59,34 @@ let browser: Browser | undefined;
 async function ensureBrowser(): Promise<Page> {
   if (!browser) {
     const launchOptions: LaunchOptions = createLaunchOptionsForPlayWright();
+
+    const config = loadConfig();
+    if (
+      config.proxy.enabled &&
+      config.proxy.isValid &&
+      config.proxy.protocol === "socks5" &&
+      (config.proxy.username || config.proxy.password)
+    ) {
+      const { protocol, host, port, username, password } = config.proxy;
+      if (host && port) {
+        const auth =
+          username || password
+            ? `${encodeURIComponent(username || "")}:${encodeURIComponent(
+                password || ""
+              )}@`
+            : "";
+        const upstreamUrl = `${protocol}://${auth}${host}:${port}`;
+        try {
+          const bridgeUrl = await startProxyBridge(upstreamUrl);
+          launchOptions.proxy = {
+            server: bridgeUrl,
+          };
+          console.debug(`Bridge activated: ${bridgeUrl} -> ${upstreamUrl}`);
+        } catch (error) {
+          console.error("Failed to start bridge, falling back to direct:", error);
+        }
+      }
+    }
 
     browser = await chromium.launch(launchOptions);
     startTimeout();
@@ -332,10 +361,13 @@ async function closeBrowser(): Promise<boolean> {
     try {
       await browser.close();
       browser = undefined;
+      await stopProxyBridge();
       console.debug("Browser closed successfully");
       return true;
     } catch (error) {
       console.debug("Failed to close browser:", (error as Error).message);
+      // Try to stop bridge even if browser close fails
+      await stopProxyBridge();
       return false;
     }
   } else {

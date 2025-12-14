@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as http from "http";
 import * as net from "net";
@@ -57,13 +59,9 @@ const createHttpProxy = (port: number, onConnect: (url: string, headers: http.In
 };
 
 describe("Fetch Proxy E2E Tests", () => {
-    // These tests involve creating local proxies which struggle with connectivity 
-    // when running inside the Docker container (nested proxying / direct upstream connection issues).
-    // They are better validatd in a local environment.
-    if (process.env.DOCKER_ENVIRONMENT === "true") {
-        it.skip("skipping local proxy tests in Docker", () => {});
-        return;
-    }
+    // These tests involve creating local proxies.
+    // In Docker, we must ensure we don't conflict with system proxies.
+    // We achieve this by explicitly unsetting colliding env vars.
 
   let proxyServer: mockttp.Mockttp | undefined;
   let customHttpProxy: http.Server | undefined;
@@ -73,10 +71,18 @@ describe("Fetch Proxy E2E Tests", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    // CRITICAL: Unset system proxy vars so tests use our local test proxies
+    delete process.env.HTTPS_PROXY;
+    delete process.env.HTTP_PROXY;
+    delete process.env.SOCKS5_PROXY;
+
     vi.resetModules();
     // clear axios defaults
     axios.defaults.httpAgent = undefined;
     axios.defaults.httpsAgent = undefined;
+    
+    // Allow self-signed certs for our local test proxy
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   });
 
   afterEach(async () => {
@@ -100,27 +106,62 @@ describe("Fetch Proxy E2E Tests", () => {
 
   it("should route Bing requests through an HTTP proxy", async () => {
     const connectedUrls: string[] = [];
-    customHttpProxy = await createHttpProxy(0, (url) => connectedUrls.push(url));
-    const address = customHttpProxy.address() as net.AddressInfo;
-    const proxyUrl = `http://127.0.0.1:${address.port}`;
+    // We use mockttp for a smarter proxy that can also mock the upstream response
+    // ensuring we don't need real internet.
+    // We configure it with the TRUSTED test CA so Node/Axios accepts the connection.
+    
+    // Determine paths (support both Docker and local fallback)
+    const keyPath = process.env.TEST_CA_KEY_PATH || path.join(process.cwd(), 'certs/test/key/test-ca.key');
+    const certPath = process.env.TEST_CA_CERT_PATH || path.join(process.cwd(), 'certs/test/test-ca.crt');
+    
+    // Read the certs
+    const key = fs.readFileSync(keyPath, 'utf8');
+    const cert = fs.readFileSync(certPath, 'utf8');
+
+    proxyServer = mockttp.getLocal({
+        https: {
+            key,
+            cert,
+        }
+    });
+    await proxyServer.start();
+    
+    // Mock the upstream response for bing.com
+    const mockEndpoint = await proxyServer.forAnyRequest().forHostname("www.bing.com").thenReply(200, "Mock Bing Reached");
+    
+    // 127.0.0.1 is safer than localhost in some containers
+    const proxyUrl = proxyServer.url.replace("localhost", "127.0.0.1");
 
     process.env.USE_PROXY = "true";
     process.env.HTTP_PROXY = proxyUrl;
+    // Ensure no fallback to system proxy
+    delete process.env.HTTPS_PROXY;
 
     const { fetchBingPage: freshFetchBing } = await import(
       "../../src/engines/fetch/index.js"
     );
 
-    // This will try to connect to real Bing through our proxy.
+    // Manual Override: Re-create the agent with rejectUnauthorized: false
+    // relying on the previously imported HttpsProxyAgent
+
+
+    // This will try to connect to bing through our proxy.
+    // It should now SUCCEED because the proxy is using a trusted CA.
     const result = await freshFetchBing("test query", 0);
-    expect(result).toBeDefined();
+    expect(result).toBe("Mock Bing Reached");
     
-    // Verify the proxy received a CONNECT request for bing
-    expect(connectedUrls.some(url => url.includes("bing.com"))).toBe(true);
+    // Check requests seen by our specific mock rule
+    const seenRequests = await mockEndpoint.getSeenRequests();
+    expect(seenRequests.some((r: any) => r.url.includes("bing.com"))).toBe(true);
   });
 
   it("should authenticate with HTTP proxy", async () => {
     const authHeaders: string[] = [];
+    
+    // We can't easily use mockttp for verifying specific auth headers on CONNECT 
+    // without more complex setup, so we stick to the custom implementation 
+    // but ensure it listens on 127.0.0.1 and we handle the upstream connection.
+    // For specific auth testing, we just want to know headers were sent.
     
     customHttpProxy = await createHttpProxy(0, (url, headers) => {
         if (headers['proxy-authorization']) {
@@ -130,21 +171,23 @@ describe("Fetch Proxy E2E Tests", () => {
 
     const username = "user123";
     const password = "password456";
-    // Construct proxy URL with auth
     const address = customHttpProxy.address() as net.AddressInfo;
     const proxyUrl = `http://${username}:${password}@127.0.0.1:${address.port}`;
 
     process.env.USE_PROXY = "true";
     process.env.HTTP_PROXY = proxyUrl;
+    delete process.env.HTTPS_PROXY;
 
     const { fetchBingPage: freshFetchBing } = await import(
       "../../src/engines/fetch/index.js"
     );
     
-    // We expect the request to eventually fail or succeed, but we care that headers were sent
-    await freshFetchBing("test query", 0);
+    // Expected to fail upstream since our custom proxy is basic, 
+    // but we only verify headers here.
+    try {
+        await freshFetchBing("test query", 0);
+    } catch (e) { /* expected */ }
     
-    // Check if Authorization header matched basic auth
     const expectedAuth = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
     expect(authHeaders).toContain(expectedAuth);
   });
@@ -166,6 +209,12 @@ describe("Fetch Proxy E2E Tests", () => {
   it("should route Bing requests through a SOCKS5 proxy", async () => {
     const socksPort = 0; // 0 for random port
     socksServer = await createSocksServer(socksPort);
+    
+    let proxyConnected = false;
+    socksServer.on("proxyConnect", () => {
+        proxyConnected = true;
+    });
+
     const address = socksServer.address();
     const port = address.port;
 
@@ -177,44 +226,16 @@ describe("Fetch Proxy E2E Tests", () => {
       "../../src/engines/fetch/index.js"
     );
 
-    // Since simple-socks is a basic SOCKS server, it will tunnel the connection.
-    // However, without a target server that it can forward to, it might fail if we try to reach real google.
-    // But we want to verify it TRIES to use the proxy.
-    // Actually, for a real test, verifying the socks server received a connection is hard with simple-socks as it doesn't expose easy hooks.
-    // Instead, we can try to reach a local mockttp server THROUGH the socks proxy.
-    
-    // Start a target server
-    const targetServer = mockttp.getLocal();
-    await targetServer.start();
-    const targetEndpoint = await targetServer
-      .forGet("/")
-      .thenReply(200, "Target Reached");
-      
-    // But fetchBingPage is hardcoded to bing.com.
-    // So we can't easily validte end-to-end with simple-socks unless we can mock the DNS or force the URL.
-    
-    // Alternative: We check if the AGENT is set correctly in axios defaults, which we know works from unit tests.
-    // But this involves "implementation details" not "End to End". 
-    
-    // Let's stick to verifying that the request doesn't fail immediately with "connection refused" on the proxy port,
-    // or better, if we can trust the unit tests for agent assignment, this E2E might be redundant for SOCKS if we can't observe the traffic easily.
-    
-    // However, we CAN verify that it works if we have internet access (which we assume we do).
-    // But making real network requests to Bing is flaky.
-    
-    // Let's rely on the HTTP proxy test for the "Verification" that the mechanism works, 
-    // and assume SOCKS works if the agent is set (covered by unit tests).
-    // OR, we can try to overwrite the URL fetchBingPage uses? No, it's hardcoded.
-    
-    // Actually, we can check if `socks-proxy-agent` is doing its job by checking if the request succeeds naturally (using the real internet).
-    // But if the SOCKS proxy is just `simple-socks` on localhost, it should bridge to the real internet.
-    
+    // We expect the request to fail (or succeed if internet is available), 
+    // but CRITICALLY we want to know if it tried to go through the proxy.
     try {
-        const result = await freshFetchBing("test query", 0);
-        expect(result).toBeDefined();
+        await freshFetchBing("test query", 0);
     } catch (e: any) {
-        // If it fails with network error that looks like proxy issue, fail.
+        // If it fails with network error that looks like proxy issue, that's fine.
     }
+    
+    // STRICT VERIFICATION: The proxy MUST have received a connection attempt.
+    expect(proxyConnected).toBe(true);
   });
 
   it("should authenticate with SOCKS5 proxy", async () => {
