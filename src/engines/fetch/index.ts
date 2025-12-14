@@ -8,9 +8,6 @@ if (config.proxy.enabled && config.proxy.isValid && config.proxy.agent) {
 }
 
 function fetchLogs() {
-  console.debug(
-    `fetch: NODE_EXTRA_CA_CERTS=${process.env.NODE_EXTRA_CA_CERTS}`
-  );
   console.debug(`fetch: Config enabled? ${config.proxy.enabled}`);
   console.debug(`fetch: Proxy agent:`, axios.defaults.httpAgent);
   console.debug(`fetch: Proxy URL:`, config.proxy.url);
