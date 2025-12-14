@@ -25,6 +25,7 @@ export async function startProxyBridge(upstreamProxyUrl: string): Promise<string
     bridgeServer = new Server({
       // 0 lets the OS assign a random available port
       port: 0,
+      host: "127.0.0.1",
       // We turned off verbose logging to keep stdout clean, unless debugging is needed
       verbose: false,
       prepareRequestFunction: () => {
