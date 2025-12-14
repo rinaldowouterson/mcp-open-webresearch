@@ -35,7 +35,9 @@ const loadProxyConfig = (): ProxyConfig => {
           PROTOCOL_PATTERN.source
         } Received: ${proxyUrl === "" ? "empty string" : proxyUrl}`;
 
-  console.debug(`loader: ${error ? `error detected: ${error}` : `no error`}`);
+  if (process.env.WRITE_DEBUG_TERMINAL === "true") {
+    console.debug(`loader: ${error ? `error detected: ${error}` : `no error`}`);
+  }
 
   let host: string | null = null;
   let port: number | null = null;
@@ -66,7 +68,9 @@ const loadProxyConfig = (): ProxyConfig => {
         };
       }
     } catch (caughtError) {
-      console.debug("loader: Failed to create proxy agent: ", caughtError);
+      if (process.env.WRITE_DEBUG_TERMINAL === "true") {
+        console.debug("loader: Failed to create proxy agent: ", caughtError);
+      }
       error = error
         ? error + `\n${caughtError};`
         : `Failed to create proxy agent: ${caughtError}`;
