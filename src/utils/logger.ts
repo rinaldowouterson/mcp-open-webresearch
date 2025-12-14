@@ -70,9 +70,10 @@ async function writeLogAsync(message: string): Promise<void> {
 }
 
 export async function captureConsoleDebug(): Promise<void> {
-  if (!WRITE_DEBUG_FILE && !WRITE_DEBUG_TERMINAL) return;
+  if (WRITE_DEBUG_FILE) {
+    await initStream();
+  }
 
-  await initStream();
   const methods: Array<"debug"> = ["debug"];
   methods.forEach(wrapConsole);
 }
