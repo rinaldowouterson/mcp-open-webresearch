@@ -1,4 +1,4 @@
-import { chromium, Browser, Page, LaunchOptions } from "playwright";
+import { chromium, Browser, Page, LaunchOptions } from "playwright-chromium";
 import TurndownService from "turndown";
 import { McpError, ErrorCode } from "../../types/mcp-error.js";
 import * as fs from "fs";
@@ -50,7 +50,7 @@ export interface VisitResult {
   url: string;
   title: string;
   content: string;
-  screenshotPath?: string;
+  screenshot?: string;
 }
 
 let browser: Browser | undefined;
@@ -75,7 +75,14 @@ async function ensureBrowser(): Promise<Page> {
 
 export function createLaunchOptionsForPlayWright() {
   const config = loadConfig();
-  const launchOptions: LaunchOptions = { headless: true };
+  const launchOptions: LaunchOptions = process.env.DOCKER_ENVIRONMENT
+    ? {
+        headless: true,
+        executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
+      }
+    : {
+        headless: true,
+      };
 
   console.debug("visit: the current config is ", config);
   console.debug(`visit: config.proxy.enabled: ${config.proxy.enabled}`);
@@ -300,12 +307,12 @@ export async function visitPage(
       url,
       title,
       content,
-      screenshotPath: undefined,
+      screenshot: undefined,
     };
 
     if (takeScreenshot) {
       const screenshot = await takeScreenshotWithSizeLimit(page);
-      result.screenshotPath = await saveScreenshot(screenshot, title);
+      result.screenshot = await saveScreenshot(screenshot, title);
     }
 
     return result;
