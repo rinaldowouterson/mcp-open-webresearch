@@ -13,13 +13,12 @@ WORKDIR /app
 COPY package*.json ./
 # Install all deps (incl. dev) for build AND testing
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true
-# Ignore scripts to prevent postinstall running before source copy
-RUN npm ci --ignore-scripts && npm cache clean --force
+RUN npm ci && npm cache clean --force
 
 # Copy source and build TS to JS
 COPY . .
-# Now run postinstall (build + generate-certs)
-RUN npm run postinstall
+# Now run generate-certs (which includes build)
+RUN npm run generate-certs
 
 # Stage 2: Test Runtime - Alpine Node with ALL deps (including dev) and Chromium
 FROM node:24-alpine
