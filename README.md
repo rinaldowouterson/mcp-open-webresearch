@@ -211,8 +211,10 @@ Returns the currently configured default search engines.
 ## Roadmap
 
 - [ ] **Context Pollution Prevention**: Implement sampling to further process search results, investigating and aggregating only high-quality results to prevent polluting the LLM context.
+- [ ] **Deep Search**: Implement a deeper search similar to Deep Research offered by Google, OpenAI, and Anthropic.
 - [ ] **Brave Rate Limiting**: Introduce a 5-second timeout/cooldown for Brave to evade rate limits. If a request is made within this window, the engine will temporarily skip Brave and rely on Bing and DuckDuckGo.
 - [ ] **Keyless GitHub Adapter**: Implement an adapter for fetching and navigating GitHub content without requiring API tokens.
+- [ ] **CLI Interface**: Add support for command-line arguments (e.g., `--debug`, `--proxy`) to allow running with `npx` and configure the server.
 
 ---
 
