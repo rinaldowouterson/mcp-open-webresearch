@@ -50,27 +50,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # --- Build and Push PRODUCTION Image ---
-      - name: Extract Docker metadata (Production)
-        id: meta-prod
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push Production Docker image
-        id: build-and-push-prod
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta-prod.outputs.tags }}
-          labels: ${{ steps.meta-prod.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
       # --- Build and Push TEST Image ---
       - name: Extract Docker metadata (Test)
         id: meta-test
@@ -90,5 +69,26 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-test.outputs.tags }}
           labels: ${{ steps.meta-test.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- Build and Push PRODUCTION Image ---
+      - name: Extract Docker metadata (Production)
+        id: meta-prod
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Production Docker image
+        id: build-and-push-prod
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-prod.outputs.tags }}
+          labels: ${{ steps.meta-prod.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
