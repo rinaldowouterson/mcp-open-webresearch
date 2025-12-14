@@ -28,6 +28,11 @@ vi.mock("../../src/config/loader.js", () => ({
   }),
 }));
 
+// Mock URL validation to allow localhost for tests
+vi.mock("../../src/utils/isValidUrl.js", () => ({
+  isValidBrowserUrl: (url: string) => /^https?:/i.test(url),
+}));
+
 let server: http.Server;
 let serverUrl: string;
 

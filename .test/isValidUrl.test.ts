@@ -76,4 +76,28 @@ describe("isValidBrowserUrl", () => {
   test("rejects URL without protocol", () => {
     expect(isValidBrowserUrl("example.com")).toBe(false);
   });
+
+  test("rejects localhost", () => {
+    expect(isValidBrowserUrl("http://localhost")).toBe(false);
+    expect(isValidBrowserUrl("http://localhost:3000")).toBe(false);
+    expect(isValidBrowserUrl("https://site.local/foo")).toBe(false);
+  });
+
+  test("rejects private IPv4 addresses", () => {
+    expect(isValidBrowserUrl("http://127.0.0.1")).toBe(false);
+    expect(isValidBrowserUrl("http://10.0.0.1")).toBe(false);
+    expect(isValidBrowserUrl("http://192.168.1.1")).toBe(false);
+    expect(isValidBrowserUrl("http://172.16.0.1")).toBe(false);
+    expect(isValidBrowserUrl("http://169.254.169.254")).toBe(false);
+  });
+
+  test("rejects private IPv6 addresses", () => {
+    expect(isValidBrowserUrl("http://[::1]")).toBe(false);
+    expect(isValidBrowserUrl("http://[fc00::1]")).toBe(false);
+  });
+
+  test("allows public IP addresses", () => {
+    expect(isValidBrowserUrl("http://8.8.8.8")).toBe(true);
+    expect(isValidBrowserUrl("http://1.1.1.1")).toBe(true);
+  });
 });
