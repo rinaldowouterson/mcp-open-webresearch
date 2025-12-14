@@ -28,7 +28,7 @@ This project stands on the shoulders of giants. I gratefully acknowledge the ins
 
 - **[pskill9/web-search](https://github.com/pskill9/web-search)**: An original pioneer that introduced a google web search pipeline for MCP.
 - **[Aas-ee/open-webSearch](https://github.com/Aas-ee/open-webSearch)**: Expanded the horizon with support for multiple search engines.
-- **[mzxrai/mcp-webresearch](https://github.com/mzxrai/mcp-webresearch)**: Provided the basic functionality for the `visit_page` endpoint.
+- **[mzxrai/mcp-webresearch](https://github.com/mzxrai/mcp-webresearch)**: Provided the basic functionality for the `visit_webpage` endpoint.
 
 ---
 
