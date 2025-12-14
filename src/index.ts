@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "dotenv/config"; // Load environment variables from .env file
 import { captureConsoleDebug, closeWritingStream } from "./utils/logger.js";
-captureConsoleDebug();
+await captureConsoleDebug();
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { serverInitializer } from "./server/initializer.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
