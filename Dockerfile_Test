@@ -6,17 +6,20 @@
 # Stage 1: Builder - Full Node for deps and build
 FROM node:24-alpine AS builder
 
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 # Copy package files for caching
 COPY package*.json ./
 # Install all deps (incl. dev) for build AND testing
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true
-RUN npm ci && npm cache clean --force
+# Ignore scripts to prevent postinstall running before source copy
+RUN npm ci --ignore-scripts && npm cache clean --force
 
 # Copy source and build TS to JS
 COPY . .
-RUN npm run build
+# Now run postinstall (build + generate-certs)
+RUN npm run postinstall
 
 # Stage 2: Test Runtime - Alpine Node with ALL deps (including dev) and Chromium
 FROM node:24-alpine
@@ -41,8 +44,10 @@ RUN apk add --no-cache \
     && rm -rf /var/cache/apk/* /tmp/* /var/tmp/* /usr/local/share/.cache /root/.npm /root/.cache
 
 # Create cert dirs
-RUN mkdir -p /usr/local/share/ca-certificates/host_certs \
-    /home/node/extra_certs
+RUN mkdir -p /usr/local/share/ca-certificates/host_certs
+
+# Rebuild to run dependency lifecycle scripts (ignored during npm ci) and run project postinstall
+# RUN npm run postinstall
 
 # Copy built code and ALL node_modules (including dev deps for testing)
 COPY --from=builder /app/build ./build
@@ -50,6 +55,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/certs ./certs
 
 # Copy launcher
 COPY --from=builder /app/docker_launcher_test.sh ./launcher_test.sh
