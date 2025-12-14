@@ -28,11 +28,14 @@ const loadProxyConfig = (): ProxyConfig => {
 
   let urlObject: URL;
   let protocol: ProxyProtocol = null;
-  let error: string | null = isValid
-    ? null
-    : `Invalid proxy URL or protocol. Expected protocol: ${
-        PROTOCOL_PATTERN.source
-      } Received: ${proxyUrl === "" ? "unset" : proxyUrl}`;
+  let error: string | null =
+    process.env.USE_PROXY === "true" && isValid
+      ? null
+      : process.env.USE_PROXY === "false"
+      ? null
+      : `Invalid proxy URL or protocol. Expected protocol: ${
+          PROTOCOL_PATTERN.source
+        } Received: ${proxyUrl === "" ? "empty string" : proxyUrl}`;
 
   console.debug(`loader: ${error ? `error detected: ${error}` : `no error`}`);
 

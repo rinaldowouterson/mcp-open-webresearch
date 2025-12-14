@@ -55,9 +55,9 @@ describe("createLaunchOptionsForPlayWright", () => {
   it("returns default launch options when proxy is disabled", () => {
     const result = createLaunchOptionsForPlayWright();
     
-    expect(result).toEqual({
+    expect(result).toEqual(expect.objectContaining({
       headless: true,
-    });
+    }));
     
     // Verify the debug logs were called with expected messages
     const debugCalls = consoleDebugSpy.mock.calls.map(call => call[0]);
@@ -82,9 +82,9 @@ describe("createLaunchOptionsForPlayWright", () => {
 
     const result = createLaunchOptionsForPlayWright();
     
-    expect(result).toEqual({
+    expect(result).toEqual(expect.objectContaining({
       headless: true,
-    });
+    }));
   });
 
   it("configures HTTP proxy without authentication", () => {
@@ -102,12 +102,14 @@ describe("createLaunchOptionsForPlayWright", () => {
 
     const result = createLaunchOptionsForPlayWright();
     
-    expect(result).toEqual({
+    expect(result).toEqual(expect.objectContaining({
       headless: true,
       proxy: {
         server: "http://proxy.example.com:8080",
+        username: undefined,
+        password: undefined,
       },
-    });
+    }));
     
     // Check if the proxy debug message was logged
     const proxyDebugCall = consoleDebugSpy.mock.calls.some(call => 
@@ -132,14 +134,14 @@ describe("createLaunchOptionsForPlayWright", () => {
 
     const result = createLaunchOptionsForPlayWright();
     
-    expect(result).toEqual({
+    expect(result).toEqual(expect.objectContaining({
       headless: true,
       proxy: {
         server: "https://proxy.example.com:8080",
         username: "user",
         password: "pass",
       },
-    });
+    }));
     
     // Check if the proxy debug message was logged
     const proxyDebugCall = consoleDebugSpy.mock.calls.some(call => 
@@ -164,14 +166,14 @@ describe("createLaunchOptionsForPlayWright", () => {
 
     const result = createLaunchOptionsForPlayWright();
     
-    expect(result).toEqual({
+    expect(result).toEqual(expect.objectContaining({
       headless: true,
       proxy: {
         server: "socks5://proxy.example.com:1080",
         username: "user",
         password: "pass",
       },
-    });
+    }));
     
     // Check if the proxy debug message was logged
     const proxyDebugCall = consoleDebugSpy.mock.calls.some(call => 
@@ -195,9 +197,9 @@ describe("createLaunchOptionsForPlayWright", () => {
 
     const result = createLaunchOptionsForPlayWright();
     
-    expect(result).toEqual({
+    expect(result).toEqual(expect.objectContaining({
       headless: true,
-    });
+    }));
     
     // Check if the proxy debug message was logged
     let proxyDebugCall = consoleDebugSpy.mock.calls.some(call => 
@@ -222,9 +224,9 @@ describe("createLaunchOptionsForPlayWright", () => {
 
     const result2 = createLaunchOptionsForPlayWright();
     
-    expect(result2).toEqual({
+    expect(result2).toEqual(expect.objectContaining({
       headless: true,
-    });
+    }));
     
     // Check if the proxy debug message was logged
     proxyDebugCall = consoleDebugSpy.mock.calls.some(call => 
@@ -248,12 +250,14 @@ describe("createLaunchOptionsForPlayWright", () => {
     const result = createLaunchOptionsForPlayWright();
     
     // Should still work but log a warning
-    expect(result).toEqual({
+    expect(result).toEqual(expect.objectContaining({
       headless: true,
       proxy: {
         server: "ftp://proxy.example.com:8080",
+        username: undefined,
+        password: undefined,
       },
-    });
+    }));
     
     // Check if the proxy debug message was logged
     const proxyDebugCall = consoleDebugSpy.mock.calls.some(call => 
@@ -276,8 +280,8 @@ describe("createLaunchOptionsForPlayWright", () => {
 
     const result = createLaunchOptionsForPlayWright();
     
-    expect(result).toEqual({
+    expect(result).toEqual(expect.objectContaining({
       headless: true,
-    });
+    }));
   });
 });

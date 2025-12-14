@@ -1,7 +1,7 @@
 {
-  "name": "mcp-open-websearch",
+  "name": "mcp-open-webresearch",
   "version": "0.0.1",
-  "description": "web search the internet",
+  "description": "MCP for web searching the internet",
   "type": "module",
   "bin": {
     "open-websearch": "./build/index.js"
@@ -30,7 +30,8 @@
     "express": "^4.18.2",
     "https-proxy-agent": "^7.0.6",
     "jsdom": "^26.1.0",
-    "playwright": "^1.54.1",
+    "playwright-chromium": "^1.56.0",
+    "simple-socks": "^3.2.0",
     "socks-proxy-agent": "^8.0.5",
     "turndown": "^7.2.0"
   },
@@ -38,6 +39,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
     "@types/jsdom": "^21.1.7",
+    "mockttp": "^3.10.0",
     "typescript": "^5.3.3",
     "vitest": "^3.2.4"
   }

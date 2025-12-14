@@ -53,12 +53,18 @@ export const serverInitializer = (server: McpServer): void => {
         .min(1)
         .max(50)
         .default(10)
-        .describe("Maximum number of results to return"),
+        .describe(
+          "Maximum number of results to return. Current default is 10. Maximum is 50. It's distributed across engines."
+        ),
       engines: z
         .array(z.enum(SUPPORTED_ENGINES))
         .min(1)
         .optional()
-        .describe("Engines to use (default: current configuration)"),
+        .describe(
+          `Engines to use. Current default is ${
+            loadConfig().defaultSearchEngines
+          }`
+        ),
     },
     async ({ query, max_results = 10, engines }) => {
       try {
@@ -114,7 +120,7 @@ export const serverInitializer = (server: McpServer): void => {
               url: result.url,
               title: result.title,
               content: result.content,
-              screenshot_path: result.screenshotPath,
+              screenshot: result.screenshot,
             },
             null,
             2

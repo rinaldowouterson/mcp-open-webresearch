@@ -1,0 +1,27 @@
+services:
+  mcp-open-webresearch-test:
+    build:
+      context: .
+      dockerfile: Dockerfile_Test
+    container_name: mcp-open-webresearch-test
+    working_dir: /app
+    environment:
+      - NODE_USE_SYSTEM_CA=1
+      - USE_PROXY=true
+      - TEST_CA_KEY_PATH=/app/certs/test/key/test-ca.key
+      - TEST_CA_CERT_PATH=/usr/local/share/ca-certificates/host_certs/test-ca.crt
+      # Docker internal networking for proxy tests logic if needed
+    volumes:
+      # Mount the public certs to the system store location
+      - ./certs/test/test-ca.crt:/usr/local/share/ca-certificates/host_certs/test-ca.crt:ro
+      # Mount the private key specifically to a secure location
+      - ./certs/test/key/test-ca.key:/app/certs/test/key/test-ca.key:ro
+      # Mount the test files so we can iterate without rebuilding (optional, but good for dev)
+      - ./.test:/app/.test:ro
+    command: ["./launcher_test.sh", "npm", "test"]
+    networks:
+      - mcp-test-network
+
+networks:
+  mcp-test-network:
+    driver: bridge
