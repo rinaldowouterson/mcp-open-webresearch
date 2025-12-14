@@ -81,7 +81,7 @@ async function ensureBrowser(): Promise<Page> {
           launchOptions.proxy = {
             server: bridgeUrl,
           };
-          console.debug(`Bridge activated: ${bridgeUrl} -> ${upstreamUrl}`);
+          console.debug(`SOCKS5 Bridge activated`);
         } catch (error) {
           console.error("Failed to start bridge, falling back to direct:", error);
         }
@@ -113,13 +113,12 @@ export function createLaunchOptionsForPlayWright() {
         headless: true,
       };
 
-  console.debug("visit: the current config is ", config);
   console.debug(`visit: config.proxy.enabled: ${config.proxy.enabled}`);
   console.debug(`visit: config.proxy.isValid: ${config.proxy.isValid}`);
-  console.debug(`visit: config.proxy.url: ${config.proxy.url}`);
+  // console.debug(`visit: config.proxy.url: ${config.proxy.url}`);
 
   if (config.proxy.enabled && config.proxy.isValid) {
-    console.debug(`Proxy configuration detected: ${config.proxy.url}`);
+    // console.debug(`Proxy configuration detected: ${config.proxy.url}`);
 
     const protocol = config.proxy.protocol;
     const host = config.proxy.host;
