@@ -91,5 +91,20 @@ export async function searchBrave(
     }
   }
 
+  // Update last request time after a successful operational attempt (even if it failed per page)
+  lastRequestTime = Date.now();
   return results.slice(0, limit);
 }
+
+// Track the last time Brave was used
+let lastRequestTime = 0;
+const BRAVE_COOLDOWN_MS = 5000;
+
+export function isBraveRateLimited(): boolean {
+  const timeSinceLastRequest = Date.now() - lastRequestTime;
+  return timeSinceLastRequest < BRAVE_COOLDOWN_MS;
+}
+
+export const resetLastRequestTime = () => {
+  lastRequestTime = 0;
+};

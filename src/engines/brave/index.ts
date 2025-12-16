@@ -1,1 +1,1 @@
-export { searchBrave } from "./brave.js";
+export { searchBrave, isBraveRateLimited, resetLastRequestTime } from "./brave.js";

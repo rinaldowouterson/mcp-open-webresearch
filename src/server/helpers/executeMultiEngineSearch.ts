@@ -1,7 +1,7 @@
 import { SearchResult, SupportedEngine } from "../../types/index.js";
 import { searchBing } from "../../engines/bing/index.js";
 import { searchDuckDuckGo } from "../../engines/duckduckgo/index.js";
-import { searchBrave } from "../../engines/brave/index.js";
+import { searchBrave, isBraveRateLimited } from "../../engines/brave/index.js";
 export const availableSearchEngines: Record<
   SupportedEngine,
   (query: string, limit: number) => Promise<SearchResult[]>
@@ -37,10 +37,25 @@ export const executeMultiEngineSearch = async (
   const cleanQuery = query.trim();
   if (!cleanQuery) throw new Error("Search query cannot be empty");
 
-  // Distribute search limit across engines
-  const engineLimits = distributeSearchLimit(maxResults, engines.length);
+  // Check for Brave rate limiting
+  const enginesToUse = [...engines];
+  const braveIndex = enginesToUse.indexOf("brave");
 
-  const searchResultPromises = engines.map((engine, index) => {
+  if (braveIndex !== -1 && isBraveRateLimited()) {
+    console.debug("Brave rate limited, skipping...");
+    enginesToUse.splice(braveIndex, 1);
+
+    // If no engines left (e.g. user only asked for Brave), fallback to Bing and DDG
+    if (enginesToUse.length === 0) {
+      console.debug("Falling back to Bing and DuckDuckGo");
+      enginesToUse.push("bing", "duckduckgo");
+    }
+  }
+
+  // Distribute search limit across engines
+  const engineLimits = distributeSearchLimit(maxResults, enginesToUse.length);
+
+  const searchResultPromises = enginesToUse.map((engine, index) => {
     const currentSearchEngine =
       availableSearchEngines[engine as SupportedEngine];
     return currentSearchEngine
