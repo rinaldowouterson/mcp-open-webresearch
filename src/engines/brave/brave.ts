@@ -59,6 +59,13 @@ export async function searchBrave(
   for (let page = 0; page < MAX_PAGES && results.length < limit; page++) {
     try {
       const offset = page * RESULTS_PER_PAGE;
+      
+      // Smart delay: ensure at least 1 second between paginated requests
+      if (page > 0) {
+        await waitForBravePageCooldown();
+      }
+
+      lastRequestTime = Date.now();
       const html = await fetchBravePage(query, offset);
       const $ = cheerio.load(html);
       const pageResults = parseResults($);
@@ -99,6 +106,17 @@ export async function searchBrave(
 // Track the last time Brave was used
 let lastRequestTime = 0;
 const BRAVE_COOLDOWN_MS = 5000;
+const BRAVE_PAGE_DELAY_MS = 1000;
+
+/**
+ * Waits for the mandatory cooldown between Brave search result pages
+ */
+async function waitForBravePageCooldown() {
+  const delay = BRAVE_PAGE_DELAY_MS - (Date.now() - lastRequestTime);
+  if (delay > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+}
 
 export function isBraveRateLimited(): boolean {
   const timeSinceLastRequest = Date.now() - lastRequestTime;

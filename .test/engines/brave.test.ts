@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { searchBrave } from "../../src/engines/brave";
 
 // Mock the config loader
-vi.mock("../../src/config/loader", () => ({
+vi.mock("../../src/config/index", () => ({
   loadConfig: vi.fn().mockReturnValue({
     proxy: {
       enabled: false,
