@@ -79,7 +79,12 @@ else
             # Fix ownership so the node user can read it
             chown -R node:node /home/node/.pki
             info "Chromium NSS Database updated."
+            
+            # Debug: List certs
+            info "Listing certs in NSS DB:"
+            certutil -L -d sql:/home/node/.pki/nssdb
         else
+
             err "Failed to update CA certificates"
             exit 1
         fi
@@ -141,7 +146,7 @@ fi
 
 # ---------- 3. Environment Setup ----------
 export NODE_USE_SYSTEM_CA=1
-export USE_PROXY=true
+export ENABLE_PROXY=true
 export HTTP_PROXY="http://localhost:8080"
 export HTTPS_PROXY="http://localhost:8080"
 
@@ -154,4 +159,18 @@ if [[ "${DRY_RUN:-false}" == "true" ]]; then
 fi
 
 info "Starting Tests as user 'node'..."
-exec gosu node "$@"
+# exec gosu node "$@"
+set +e
+gosu node "$@"
+TEST_EXIT_CODE=$?
+set -e
+
+info "Tests finished with exit code $TEST_EXIT_CODE."
+# if [[ -f /tmp/mitmproxy.log ]]; then
+#     tail -n 50 /tmp/mitmproxy.log
+# else
+#     warn "/tmp/mitmproxy.log not found."
+# fi
+
+exit $TEST_EXIT_CODE
+

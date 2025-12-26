@@ -1,0 +1,45 @@
+services:
+  production:
+    image: mcp-open-webresearch:latest
+    build:
+      context: ../../
+      dockerfile: .test/docker/Dockerfile.test.prod-check
+    container_name: mcp-production-test
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    
+    env_file: ../../.env
+
+    # Overlay environment to enable terminal debugging for verification
+    environment:
+      - WRITE_DEBUG_TERMINAL=true
+
+    volumes:
+      - ${CERT_HOST_FOR_STORE:+${CERT_HOST_FOR_STORE}:/usr/local/share/ca-certificates/host_certs:ro}
+    
+    networks:
+      - mcp-network
+
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "node"]
+      interval: 10s
+      timeout: 1s
+      retries: 1
+      start_period: 60s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  mcp-network:
+    driver: bridge

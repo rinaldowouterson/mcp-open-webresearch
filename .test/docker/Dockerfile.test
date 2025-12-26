@@ -1,4 +1,4 @@
-# Multi-Stage Dockerfile for mcp-open-webresearch (Test Environment)
+# Multi-Stage Dockerfile for mcp-open-webresearch (Test Environment with all dev deps)
 #
 # Purpose: Test-ready image compatible with Node v24 LTS.
 # - Based on the production Alpine image structure but retains dev deps/tools needed for testing.
@@ -13,7 +13,8 @@ WORKDIR /app
 COPY package*.json ./
 # Install all deps (incl. dev) for build AND testing
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true
-RUN npm ci && npm cache clean --force
+# Install dependencies with verbose logging
+RUN npm ci --verbose && npm cache clean --force
 
 # Copy source and build TS to JS
 COPY . .
@@ -57,7 +58,7 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/certs ./certs
 
 # Copy launcher
-COPY --from=builder /app/docker_launcher_test.sh ./launcher_test.sh
+COPY --from=builder /app/.test/docker/launcher_test.sh ./launcher_test.sh
 
 ENV PLAYWRIGHT_BROWSERS_PATH=0
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true

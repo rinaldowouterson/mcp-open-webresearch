@@ -45,10 +45,10 @@ err() { log ERROR "$1"; }
      
     info "Using Chromium at: $CHROMIUM_EXECUTABLE_PATH"
 
-    info "Configuration: USE_PROXY==> $USE_PROXY |____| DRY_RUN==> $DRY_RUN"
+    info "Configuration: ENABLE_PROXY==> $ENABLE_PROXY |____| DRY_RUN==> $DRY_RUN"
 
     # If not using proxy, we can skip all certificate validation and run node directly
-    if [[ "$USE_PROXY" == "false" ]]; then
+    if [[ "$ENABLE_PROXY" == "false" ]]; then
         export NODE_USE_SYSTEM_CA=0
         info "Proxy disabled - NODE_USE_SYSTEM_CA set to 0"
         info "Proxy not required - proceeding with simple startup"
@@ -59,9 +59,9 @@ err() { log ERROR "$1"; }
         info "Starting node.js as non-root user with ES modules support"
         exec gosu node node "build/index.js"
     fi
-# If USE_PROXY is not "false", it must be "true" for proxy configuration
-if [[ "$USE_PROXY" != "true" ]]; then
-    err "Invalid value for USE_PROXY: '$USE_PROXY'. Must be 'true' or 'false'."
+# If ENABLE_PROXY is not "false", it must be "true" for proxy configuration
+if [[ "$ENABLE_PROXY" != "true" ]]; then
+    err "Invalid value for ENABLE_PROXY: '$ENABLE_PROXY'. Must be 'true' or 'false'."
     exit 1
 fi
 
