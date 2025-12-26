@@ -153,6 +153,25 @@ The server is highly configurable via Environment Variables or a `.env` file.
 2. `HTTPS_PROXY`
 3. `HTTP_PROXY`
 
+### Command Line Arguments
+
+You can also configure the server using command-line arguments, which override environment variables:
+
+| Argument            | Description                              |
+| :------------------ | :--------------------------------------- |
+| `--port <number>`   | Port to listen on                        |
+| `--debug`           | Enable debug logging to stdout           |
+| `--debug-file`      | Enable debug logging to file             |
+| `--cors`            | Enable CORS                              |
+| `--proxy <url>`     | Proxy URL (supports http, https, socks5) |
+| `--engines <items>` | Comma-separated list of search engines   |
+
+Example:
+
+```bash
+npm start --debug --proxy socks5://localhost:1080
+```
+
 ---
 
 ## Tools Documentation
@@ -212,10 +231,7 @@ Returns the currently configured default search engines.
 
 - [ ] **Context Pollution Prevention**: Implement sampling to further process search results, investigating and aggregating only high-quality results to prevent polluting the LLM context.
 - [ ] **Deep Search**: Implement a deeper search similar to Deep Research offered by Google, OpenAI, and Anthropic.
-- [x] **Brave Rate Limiting**: Introduce a 5-second timeout/cooldown for Brave to evade rate limits. If a request is made within this window, the engine will temporarily skip Brave and rely on Bing and DuckDuckGo.
-  - [x] implement 1s timeouts for navigating between offsets to avoid rate limits
 - [ ] **Keyless GitHub Adapter**: Implement an adapter for fetching and navigating GitHub content without requiring API tokens.
-- [x] **CLI Interface**: Add support for command-line arguments (e.g., `--debug`, `--proxy`) to allow running with `npx` and configure the server.
 
 ---
 
