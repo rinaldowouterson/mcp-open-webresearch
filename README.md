@@ -139,7 +139,7 @@ The server is highly configurable via Environment Variables or a `.env` file.
 | `ENABLE_CORS`            | `false`                 | Enable/Disable CORS.                    |
 | `CORS_ORIGIN`            | `*`                     | Allowed CORS origin.                    |
 | `DEFAULT_SEARCH_ENGINES` | `bing,duckduckgo,brave` | Comma-separated list of engines to use. |
-| `USE_PROXY`              | `false`                 | Global switch to enable proxy usage.    |
+| `ENABLE_PROXY`           | `false`                 | Global switch to enable proxy usage.    |
 | `HTTP_PROXY`             | -                       | HTTP Proxy URL.                         |
 | `HTTPS_PROXY`            | -                       | HTTPS Proxy URL.                        |
 | `SOCKS5_PROXY`           | -                       | SOCKS5 Proxy URL (Highest Priority).    |
@@ -213,8 +213,9 @@ Returns the currently configured default search engines.
 - [ ] **Context Pollution Prevention**: Implement sampling to further process search results, investigating and aggregating only high-quality results to prevent polluting the LLM context.
 - [ ] **Deep Search**: Implement a deeper search similar to Deep Research offered by Google, OpenAI, and Anthropic.
 - [x] **Brave Rate Limiting**: Introduce a 5-second timeout/cooldown for Brave to evade rate limits. If a request is made within this window, the engine will temporarily skip Brave and rely on Bing and DuckDuckGo.
+  - [x] implement 1s timeouts for navigating between offsets to avoid rate limits
 - [ ] **Keyless GitHub Adapter**: Implement an adapter for fetching and navigating GitHub content without requiring API tokens.
-- [ ] **CLI Interface**: Add support for command-line arguments (e.g., `--debug`, `--proxy`) to allow running with `npx` and configure the server.
+- [x] **CLI Interface**: Add support for command-line arguments (e.g., `--debug`, `--proxy`) to allow running with `npx` and configure the server.
 
 ---
 
