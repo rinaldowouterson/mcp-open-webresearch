@@ -15,7 +15,7 @@ vi.mock('https-proxy-agent', () => ({
 
 // Mock the config loader module
 const mockLoadConfig = vi.fn();
-vi.mock("../../src/config/loader", () => ({
+vi.mock("../../src/config/index", () => ({
   loadConfig: mockLoadConfig,
 }));
 

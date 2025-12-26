@@ -2,7 +2,7 @@ import { test, expect, vi } from "vitest";
 import { searchDuckDuckGo } from "../../src/engines/duckduckgo";
 
 // Mock the config loader
-vi.mock("../../src/config/loader", () => ({
+vi.mock("../../src/config/index", () => ({
   loadConfig: vi.fn().mockReturnValue({
     proxy: {
       enabled: false,

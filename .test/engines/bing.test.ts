@@ -1,9 +1,9 @@
 import { test, expect, vi, beforeEach } from "vitest";
 import { searchBing } from "../../src/engines/bing";
-import { loadConfig } from "../../src/config/loader";
+import { loadConfig } from "../../src/config/";
 
 // Mock the config loader
-vi.mock("../../src/config/loader", () => ({
+vi.mock("../../src/config/index", () => ({
   loadConfig: vi.fn().mockReturnValue({
     proxy: {
       enabled: false,

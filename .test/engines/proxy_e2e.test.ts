@@ -53,7 +53,7 @@ describe("Proxy E2E Tests", () => {
 
     const mockedEndpoint = await proxyServer.forAnyRequest().thenPassThrough();
 
-    process.env.USE_PROXY = "true";
+    process.env.ENABLE_PROXY = "true";
     process.env.HTTP_PROXY = proxyUrl;
     // loader.ts prioritizes HTTPS_PROXY, which is set in Docker environment.
     // We must unset it to ensure HTTP_PROXY is picked up.
@@ -64,7 +64,7 @@ describe("Proxy E2E Tests", () => {
     console.log("DEBUG: Env HTTP_PROXY:", process.env.HTTP_PROXY);
     console.log("DEBUG: Env HTTPS_PROXY:", process.env.HTTPS_PROXY);
     console.log("DEBUG: Env SOCKS5_PROXY:", process.env.SOCKS5_PROXY);
-    console.log("DEBUG: Env USE_PROXY:", process.env.USE_PROXY);
+    console.log("DEBUG: Env ENABLE_PROXY:", process.env.ENABLE_PROXY);
 
     vi.resetModules(); // Force config reload
     const { visitPage } = await import("../../src/engines/visit_page/visit.js");
@@ -97,7 +97,7 @@ describe("Proxy E2E Tests", () => {
         const address = socksServer.address();
         const port = address.port;
         try {
-          process.env.USE_PROXY = "true";
+          process.env.ENABLE_PROXY = "true";
           process.env.SOCKS5_PROXY = `socks5://127.0.0.1:${port}`;
 
           vi.resetModules(); // Force config reload
@@ -146,7 +146,7 @@ describe("Proxy E2E Tests", () => {
         const address = socksServer.address();
         const port = address.port;
         try {
-          process.env.USE_PROXY = "true";
+          process.env.ENABLE_PROXY = "true";
           const username = "user123";
           const password = "pass456";
           process.env.SOCKS5_PROXY = `socks5://${username}:${password}@127.0.0.1:${port}`;
@@ -201,7 +201,7 @@ describe("Proxy E2E Tests", () => {
     });
     await socksPromise;
 
-    process.env.USE_PROXY = "true";
+    process.env.ENABLE_PROXY = "true";
     process.env.SOCKS5_PROXY = `socks5://127.0.0.1:${assignedPorts}`; // This should be picked
     process.env.HTTP_PROXY = httpProxy.url; // This should be ignored
 

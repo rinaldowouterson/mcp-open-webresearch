@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { isValidBrowserUrl } from "../src/utils/isValidUrl";
-import { urlSeemsValid as isValidUrl } from "../src/config/loader.ts";
+import { validProtocolPattern as isValidUrl } from "../src/config";
 
 describe("isValidUrl", () => {
   test("validates HTTP URL", () => {

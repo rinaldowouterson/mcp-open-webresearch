@@ -132,7 +132,7 @@ describe("Fetch Proxy E2E Tests", () => {
     // 127.0.0.1 is safer than localhost in some containers
     const proxyUrl = proxyServer.url.replace("localhost", "127.0.0.1");
 
-    process.env.USE_PROXY = "true";
+    process.env.ENABLE_PROXY = "true";
     process.env.HTTP_PROXY = proxyUrl;
     // Ensure no fallback to system proxy
     delete process.env.HTTPS_PROXY;
@@ -174,7 +174,7 @@ describe("Fetch Proxy E2E Tests", () => {
     const address = customHttpProxy.address() as net.AddressInfo;
     const proxyUrl = `http://${username}:${password}@127.0.0.1:${address.port}`;
 
-    process.env.USE_PROXY = "true";
+    process.env.ENABLE_PROXY = "true";
     process.env.HTTP_PROXY = proxyUrl;
     delete process.env.HTTPS_PROXY;
 
@@ -193,7 +193,7 @@ describe("Fetch Proxy E2E Tests", () => {
   });
 
   it("should route traffic directly when proxy is disabled", async () => {
-    process.env.USE_PROXY = "false";
+    process.env.ENABLE_PROXY = "false";
     
     const { fetchBingPage: freshFetchBing } = await import(
         "../../src/engines/fetch/index.js"
@@ -218,7 +218,7 @@ describe("Fetch Proxy E2E Tests", () => {
     const address = socksServer.address();
     const port = address.port;
 
-    process.env.USE_PROXY = "true";
+    process.env.ENABLE_PROXY = "true";
     process.env.SOCKS5_PROXY = `socks5://localhost:${port}`;
 
     // Re-import to load config and set agents
@@ -260,7 +260,7 @@ describe("Fetch Proxy E2E Tests", () => {
 
     const username = "user123";
     const password = "pass456";
-    process.env.USE_PROXY = "true";
+    process.env.ENABLE_PROXY = "true";
     process.env.SOCKS5_PROXY = `socks5://${username}:${password}@localhost:${port}`;
 
     const { fetchBingPage: freshFetchBing } = await import(
