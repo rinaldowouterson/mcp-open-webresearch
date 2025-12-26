@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { visitPage } from "../engines/visit_page/visit.js";
 import { z } from "zod";
-import { loadConfig } from "../config/loader.js";
+import { loadConfig } from "../config/index.js";
 import { SUPPORTED_ENGINES } from "../types/index.js";
 import { executeMultiEngineSearch } from "./helpers/executeMultiEngineSearch.js";
 import { updateDefaultSearchEngines } from "./helpers/updateDefaultSearchEngines.js";

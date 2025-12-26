@@ -5,7 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { isValidBrowserUrl } from "../../utils/isValidUrl.js";
-import { loadConfig } from "../../config/loader.js";
+import { loadConfig } from "../../config/index.js";
 import { startProxyBridge, stopProxyBridge } from "../../utils/proxy_bridge.js";
 
 const SCREENSHOTS_DIR = fs.mkdtempSync(

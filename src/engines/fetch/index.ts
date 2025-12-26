@@ -1,5 +1,5 @@
 import axios from "axios";
-import { loadConfig } from "../../config/loader.js";
+import { loadConfig } from "../../config/index.js";
 
 const config = loadConfig();
 if (config.proxy.enabled && config.proxy.isValid && config.proxy.agent) {

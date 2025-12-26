@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "dotenv/config"; // Load environment variables from .env file
 import { captureConsoleDebug, closeWritingStream } from "./utils/logger.js";
-await captureConsoleDebug();
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { serverInitializer } from "./server/initializer.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -11,9 +11,11 @@ import express from "express";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
 import cors from "cors";
-import { loadConfig } from "./config/loader.js";
-
+import { program } from "commander";
+import { loadConfig } from "./config/index.js";
+import { type ConfigOverrides } from "./types/ConfigOverrides.js";
 import { cleanBrowserSession } from "./engines/visit_page/visit.js";
+import { configureLogger } from "./utils/logger.js";
 
 process.on("SIGTERM", async () => {
   console.debug("Received SIGTERM (VSCode closing), cleaning session...");
@@ -39,6 +41,39 @@ process.on("SIGHUP", async () => {
 });
 
 async function main() {
+  program
+    .option("-p, --port <number>", "Port to listen on")
+    .option("-d, --debug", "Enable debug logging to stdout")
+    .option("--debug-file", "Enable debug logging to file")
+    .option("--cors", "Enable CORS")
+    .option("--proxy <url>", "Proxy URL")
+    .option(
+      "--engines <items>",
+      "Comma-separated list of search engines",
+      (value) => value.split(",")
+    )
+    .parse();
+
+  const options = program.opts();
+
+  const overrides: ConfigOverrides = {
+    port: options.port ? parseInt(options.port, 10) : undefined,
+    debug: options.debug,
+    debugFile: options.debugFile,
+    cors: options.cors,
+    proxyUrl: options.proxy,
+    engines: options.engines,
+  };
+
+  configureLogger({
+    writeToTerminal: overrides.debug,
+    writeToFile: overrides.debugFile,
+  });
+
+  await captureConsoleDebug();
+
+  const appConfig = loadConfig(overrides);
+
   const app = express();
 
   const mcpServer = new McpServer({
@@ -50,10 +85,10 @@ async function main() {
 
   app.use(express.json());
 
-  if (loadConfig().enableCors) {
+  if (appConfig.enableCors) {
     app.use(
       cors({
-        origin: loadConfig().corsOrigin || "*",
+        origin: appConfig.corsOrigin || "*",
         methods: ["GET", "POST", "DELETE"],
       })
     );
@@ -146,7 +181,7 @@ async function main() {
     }
   });
 
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const PORT = overrides.port || (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000);
   const transport = new StdioServerTransport();
   await mcpServer
     .connect(transport)

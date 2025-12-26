@@ -3,8 +3,26 @@ import path from "path";
 import { format } from "util";
 
 const LOG_PATH = path.resolve(process.cwd(), "mcp-debug.log");
-const WRITE_DEBUG_TERMINAL = process.env.WRITE_DEBUG_TERMINAL === "true";
-const WRITE_DEBUG_FILE = process.env.WRITE_DEBUG_FILE === "true";
+
+interface LoggerConfig {
+  writeToTerminal: boolean;
+  writeToFile: boolean;
+}
+
+const loggerConfig: LoggerConfig = {
+  writeToTerminal: process.env.WRITE_DEBUG_TERMINAL === "true",
+  writeToFile: process.env.WRITE_DEBUG_FILE === "true",
+};
+
+export function configureLogger(options: Partial<LoggerConfig>) {
+  if (options.writeToTerminal !== undefined) {
+    loggerConfig.writeToTerminal = options.writeToTerminal;
+  }
+  if (options.writeToFile !== undefined) {
+    loggerConfig.writeToFile = options.writeToFile;
+  }
+}
+
 let stream: fs.FileHandle | null = null;
 
 async function initStream(): Promise<void> {
@@ -39,11 +57,11 @@ export async function closeWritingStream(): Promise<void> {
 function wrapConsole(method: "log" | "error" | "warn" | "debug"): void {
   const orig = console[method] as (...args: any[]) => void;
   console[method] = (...args: any[]) => {
-    if (method === "debug" && WRITE_DEBUG_TERMINAL) {
+    if (method === "debug" && loggerConfig.writeToTerminal) {
       orig(...args);
     }
 
-    if (method === "debug" && WRITE_DEBUG_FILE) {
+    if (method === "debug" && loggerConfig.writeToFile) {
       const timestamp = new Date().toISOString();
       const message = format(...args);
 
@@ -70,7 +88,7 @@ async function writeLogAsync(message: string): Promise<void> {
 }
 
 export async function captureConsoleDebug(): Promise<void> {
-  if (WRITE_DEBUG_FILE) {
+  if (loggerConfig.writeToFile) {
     await initStream();
   }
 
@@ -91,10 +109,10 @@ export async function clearLogFile(): Promise<void> {
 
 export const logger = {
   async debug(message: string, ...args: any[]): Promise<void> {
-    if (WRITE_DEBUG_TERMINAL) {
+    if (loggerConfig.writeToTerminal) {
       console.debug(message, ...args);
     }
-    if (WRITE_DEBUG_FILE) {
+    if (loggerConfig.writeToFile) {
       const formatted = format(message, ...args);
       await writeLogAsync(
         `[${new Date().toISOString()}] DEBUG: ${formatted}\n`
