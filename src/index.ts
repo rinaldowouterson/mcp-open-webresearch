@@ -77,8 +77,8 @@ async function main() {
   const app = express();
 
   const mcpServer = new McpServer({
-    name: "web-search",
-    version: "1.1",
+    name: "open-webresearch",
+    version: "25.12.28",
   });
 
   serverInitializer(mcpServer);

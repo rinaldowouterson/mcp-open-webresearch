@@ -9,14 +9,16 @@ import { createResponse } from "./helpers/createResponse.js";
 
 export const serverInitializer = (server: McpServer): void => {
   // Tool: Update default search engines
-  server.tool(
+  server.registerTool(
     "update_default",
-    "Update default search engines and persist to .env",
     {
-      engines: z
-        .array(z.enum(SUPPORTED_ENGINES))
-        .min(1)
-        .describe("Comma-separated list of search engines to set as default"),
+      description: "Update default search engines and persist to .env",
+      inputSchema: {
+        engines: z
+          .array(z.enum(SUPPORTED_ENGINES))
+          .min(1)
+          .describe("Comma-separated list of search engines to set as default"),
+      },
     },
     async ({ engines }) => {
       return await updateDefaultSearchEngines(engines);
@@ -24,10 +26,12 @@ export const serverInitializer = (server: McpServer): void => {
   );
 
   // Tool: Check current defaults
-  server.tool(
+  server.registerTool(
     "check_default",
-    "Check currently configured default search engines",
-    {},
+    {
+      description: "Check currently configured default search engines",
+      inputSchema: {},
+    },
     async () => {
       return createResponse(
         JSON.stringify(
@@ -40,31 +44,33 @@ export const serverInitializer = (server: McpServer): void => {
   );
 
   // Tool: Web search
-  server.tool(
+  server.registerTool(
     "search_web",
-    "Search the web using multiple engines",
     {
-      query: z
-        .string()
-        .min(1, "Search query must not be empty")
-        .describe("Search query string"),
-      max_results: z
-        .number()
-        .min(1)
-        .max(50)
-        .default(10)
-        .describe(
-          "Maximum number of results to return. Current default is 10. Maximum is 50. It's distributed across engines."
-        ),
-      engines: z
-        .array(z.enum(SUPPORTED_ENGINES))
-        .min(1)
-        .optional()
-        .describe(
-          `Engines to use. Current default is ${
+      description: "Search the web using multiple engines",
+      inputSchema: {
+        query: z
+          .string()
+          .min(1, "Search query must not be empty")
+          .describe("Search query string"),
+        max_results: z
+          .number()
+          .min(1)
+          .max(50)
+          .default(10)
+          .describe(
+            "Maximum number of results to return. Current default is 10. Maximum is 50. It's distributed across engines."
+          ),
+        engines: z
+          .array(z.enum(SUPPORTED_ENGINES))
+          .min(1)
+          .optional()
+          .describe(
+            `Engines to use. Current default is ${
             loadConfig().defaultSearchEngines
           }`
-        ),
+          ),
+      },
     },
     async ({ query, max_results = 10, engines }) => {
       try {
@@ -100,16 +106,18 @@ export const serverInitializer = (server: McpServer): void => {
   );
 
   // Tool: Visit webpage
-  server.tool(
+  server.registerTool(
     "visit_webpage",
-    "Visit a webpage and extract its content",
     {
-      url: z.string().url().describe("URL of the page to visit"),
-      capture_screenshot: z
-        .boolean()
-        .optional()
-        .default(false)
-        .describe("Whether to capture a screenshot"),
+      description: "Visit a webpage and extract its content",
+      inputSchema: {
+        url: z.string().url().describe("URL of the page to visit"),
+        capture_screenshot: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Whether to capture a screenshot"),
+      },
     },
     async ({ url, capture_screenshot }) => {
       try {

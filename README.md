@@ -230,7 +230,7 @@ Returns the currently configured default search engines.
 ## Roadmap
 
 - [ ] **Context Pollution Prevention**: Implement sampling to further process search results, investigating and aggregating only high-quality results to prevent polluting the LLM context.
-- [ ] **Deep Search**: Implement a deeper search similar to Deep Research offered by Google, OpenAI, and Anthropic.
+- [ ] **Deep Search**: Implement a deeper search similar to Deep Research offered by Google, OpenAI.
 - [ ] **Keyless GitHub Adapter**: Implement an adapter for fetching and navigating GitHub content without requiring API tokens.
 
 ---
