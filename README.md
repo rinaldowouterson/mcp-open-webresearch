@@ -23,13 +23,13 @@ I have designed this tool to be robust and respectful of complex network environ
 
 ---
 
-## Honorable Mentions & Credits
+## Credits
 
-This project stands on the shoulders of giants. I gratefully acknowledge the inspiration and foundations provided by:
+This project includes work from the following contributors:
 
-- **[pskill9/web-search](https://github.com/pskill9/web-search)**: An original pioneer that introduced a google web search pipeline for MCP.
-- **[Aas-ee/open-webSearch](https://github.com/Aas-ee/open-webSearch)**: Expanded the horizon with support for multiple search engines.
-- **[mzxrai/mcp-webresearch](https://github.com/mzxrai/mcp-webresearch)**: Provided the basic functionality for the `visit_webpage` endpoint.
+- **Manav Kundra**: Initial implementation of the server.
+- **Aasee**: Added multiple search engines and Docker support.
+- **mzxrai**: Core logic for the `visit_page` tool.
 
 ---
 
