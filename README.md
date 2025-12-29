@@ -52,6 +52,34 @@ docker run -p 3000:3000 ghcr.io/rinaldowouterson/mcp-open-webresearch:latest
 docker pull ghcr.io/rinaldowouterson/mcp-open-webresearch:test
 ```
 
+### Local Installation (Stdio)
+
+To run the server locally (e.g., in Claude Desktop or Cline), use the following configuration.
+
+> [!NOTE]
+> Make sure to replace `/absolute/path/to/project` with the actual path to where you cloned this repository.
+
+**File:** `mcp_config.json` (or typically `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS)
+
+```json
+{
+  "mcpServers": {
+    "open-webresearch": {
+      "command": "npm",
+      "args": [
+        "run",
+        "start:sampling",
+        "--silent",
+        "--prefix",
+        "/absolute/path/to/project"
+      ],
+      "headers": {},
+      "disabled": false
+    }
+  }
+}
+```
+
 ### Remote Server (Streamable HTTP)
 
 This server supports recent MCP standards (Streamable HTTP) for remote connections.
