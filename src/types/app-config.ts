@@ -22,7 +22,6 @@ export interface ProxyConfig {
   port: number | null;
   username?: string | null;
   password?: string | null;
-  agent?: ProxyAgent;
 }
 
 export interface AppConfig {

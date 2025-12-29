@@ -96,7 +96,6 @@ const loadProxyConfig = (overrides?: ConfigOverrides): ProxyConfig => {
     port,
     username,
     password,
-    agent,
   };
 };
 

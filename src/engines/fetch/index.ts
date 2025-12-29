@@ -1,16 +1,10 @@
-import axios from "axios";
 import { loadConfig } from "../../config/index.js";
-import { browserFetch } from "./impersonator.js";
+import { smartFetch } from "./client.js";
 
 const config = loadConfig();
-if (config.proxy.enabled && config.proxy.isValid && config.proxy.agent) {
-  axios.defaults.httpAgent = config.proxy.agent.http;
-  axios.defaults.httpsAgent = config.proxy.agent.https;
-}
 
 function fetchLogs() {
   console.debug(`fetch: Config enabled? ${config.proxy.enabled}`);
-  console.debug(`fetch: Proxy agent:`, axios.defaults.httpAgent);
   console.debug(`fetch: Proxy URL:`, config.proxy.url);
 }
 
@@ -26,7 +20,6 @@ async function fetchBingPage(query: string, page: number): Promise<string> {
   try {
     fetchLogs();
     
-    // NEW: Use impersonatedFetch (impit) instead of axios
     const params = new URLSearchParams({
       q: query,
       first: (1 + page * 10).toString(),
@@ -39,7 +32,8 @@ async function fetchBingPage(query: string, page: number): Promise<string> {
     const url = `https://www.bing.com/search?${params.toString()}`;
     console.debug(`fetch: Fetching Bing page (browser-like): ${url}`);
     
-    return await browserFetch(url);
+    // Bing requires browser impersonation
+    return await smartFetch(url, { browserMode: true });
   } catch (error) {
     throw new Error(
       `Bing search failed: ${
@@ -69,7 +63,8 @@ async function fetchBravePage(query: string, offset: number): Promise<string> {
     const url = `https://search.brave.com/search?${params.toString()}`;
     console.debug(`fetch: Fetching Brave page (browser-like): ${url}`);
 
-    return await browserFetch(url);
+    // Brave requires browser impersonation
+    return await smartFetch(url, { browserMode: true });
   } catch (error) {
     throw new Error(
       `Brave search failed: ${
@@ -79,65 +74,19 @@ async function fetchBravePage(query: string, offset: number): Promise<string> {
   }
 }
 
-function createDuckDuckHeaders(type: "search" | "api"): Record<string, string> {
-  if (type !== "search" && type !== "api") {
-    throw new Error(`Invalid type: ${type}. Must be "search" or "api".`);
-  }
-
-  const base = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
-    Connection: "keep-alive",
-    "Accept-Encoding": "gzip, deflate, br",
-    "accept-language": "en-NL,en;q=0.9",
-    Referer: "https://duckduckgo.com/",
-    "sec-ch-ua":
-      '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": '"macOS"',
-    "cache-control": "no-cache",
-    pragma: "no-cache",
-    priority: "u=0, i",
-    cookie: "ah=us-en; l=us-en",
-  };
-
-  switch (type) {
-    case "search":
-      return {
-        ...base,
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "upgrade-insecure-requests": "1",
-        "sec-fetch-site": "same-origin",
-        "sec-fetch-mode": "navigate",
-        "sec-fetch-user": "?1",
-        "sec-fetch-dest": "document",
-      };
-    case "api":
-      return {
-        ...base,
-        Accept: "*/*",
-        "sec-fetch-site": "same-site",
-        "sec-fetch-mode": "no-cors",
-        "sec-fetch-dest": "script",
-      };
-  }
-}
-
 /**
  * Fetches content from DuckDuckGo
  * @param url URL to fetch
- * @param headers Request headers
  * @returns HTML content string
  * @throws Error if request fails
  */
 async function fetchDuckDuckGo(
   url: string,
-  headers: Record<string, string>
 ): Promise<string> {
   fetchLogs();
-  const response = await axios.get(url, { headers });
-  return response.data;
+  // DuckDuckGo prefers standard http client (no TLS fingerprinting/impersonation)
+  // We explicitly disable browser mode.
+  return await smartFetch(url, { browserMode: false });
 }
 
 /**
@@ -147,8 +96,7 @@ async function fetchDuckDuckGo(
  */
 async function fetchDuckDuckSearchPage(query: string): Promise<string> {
   return fetchDuckDuckGo(
-    `https://duckduckgo.com/?q=${encodeURIComponent(query)}&t=h_&ia=web`,
-    createDuckDuckHeaders("search")
+    `https://duckduckgo.com/?q=${encodeURIComponent(query)}&t=h_&ia=web`
   );
 }
 
@@ -168,7 +116,7 @@ async function fetchDuckDuckApiResults(
     generatedUrlWithOffset.searchParams.set("s", offset.toString());
     return generatedUrlWithOffset.toString();
   })();
-  return fetchDuckDuckGo(apiUrlWithOffset, createDuckDuckHeaders("api"));
+  return fetchDuckDuckGo(apiUrlWithOffset);
 }
 
 export {
