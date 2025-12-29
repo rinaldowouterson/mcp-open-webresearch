@@ -9,6 +9,7 @@ services:
     environment:
       - NODE_USE_SYSTEM_CA=1
       - ENABLE_PROXY=true
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
       - TEST_CA_KEY_PATH=/app/certs/test/key/test-ca.key
       - TEST_CA_CERT_PATH=/usr/local/share/ca-certificates/host_certs/test-ca.crt
       # Docker internal networking for proxy tests logic if needed

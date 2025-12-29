@@ -13,7 +13,7 @@ vi.mock("../../src/config/index", () => ({
       agent: null,
     },
     ssl: {
-      ignoreTlsErrors: false,
+      ignoreTlsErrors: process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0",
     },
   }),
 }));
