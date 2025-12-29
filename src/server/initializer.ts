@@ -5,12 +5,15 @@ import { loadConfig } from "../config/index.js";
 import { SUPPORTED_ENGINES } from "../types/index.js";
 import { executeMultiEngineSearch } from "./helpers/executeMultiEngineSearch.js";
 import { updateDefaultSearchEngines } from "./helpers/updateDefaultSearchEngines.js";
+import { updateSampling } from "./helpers/updateSampling.js";
+import { getSampling, getSamplingResponse } from "./helpers/getSampling.js";
+import { filterResultsWithSampling } from "./helpers/filterResultsWithSampling.js";
 import { createResponse } from "./helpers/createResponse.js";
 
-export const serverInitializer = (server: McpServer): void => {
+export const serverInitializer = (mcpServer: McpServer): void => {
   // Tool: Update default search engines
-  server.registerTool(
-    "update_default",
+  mcpServer.registerTool(
+    "set_engines",
     {
       description: "Update default search engines and persist to .env",
       inputSchema: {
@@ -25,9 +28,9 @@ export const serverInitializer = (server: McpServer): void => {
     }
   );
 
-  // Tool: Check current defaults
-  server.registerTool(
-    "check_default",
+  // Tool: Get current engines
+  mcpServer.registerTool(
+    "get_engines",
     {
       description: "Check currently configured default search engines",
       inputSchema: {},
@@ -43,11 +46,42 @@ export const serverInitializer = (server: McpServer): void => {
     }
   );
 
+  // Tool: Set sampling
+  mcpServer.registerTool(
+    "set_sampling",
+    {
+      description:
+        "Enable or disable sampling for search results. When enabled, uses the client's LLM to filter out irrelevant/low-quality results before returning them. Persists setting to .env",
+      inputSchema: {
+        enabled: z
+          .boolean()
+          .describe("Whether to enable sampling for search results"),
+      },
+    },
+    async ({ enabled }) => {
+      return await updateSampling(enabled);
+    }
+  );
+
+  // Tool: Get sampling status
+  mcpServer.registerTool(
+    "get_sampling",
+    {
+      description:
+        "Check whether sampling is currently enabled. When sampling is enabled, search results are filtered using the client's LLM to remove irrelevant content.",
+      inputSchema: {},
+    },
+    async () => {
+      return getSamplingResponse();
+    }
+  );
+
   // Tool: Web search
-  server.registerTool(
+  mcpServer.registerTool(
     "search_web",
     {
-      description: "Search the web using multiple engines",
+      description:
+        "Search the web using multiple engines. When sampling is enabled, results are filtered using the client's LLM to remove irrelevant content.",
       inputSchema: {
         query: z
           .string()
@@ -66,30 +100,57 @@ export const serverInitializer = (server: McpServer): void => {
           .min(1)
           .optional()
           .describe(
-            `Engines to use. Current default is ${
-            loadConfig().defaultSearchEngines
-          }`
+            `Engines to use. Current default is ${loadConfig().defaultSearchEngines}`
+          ),
+        sampling: z
+          .boolean()
+          .optional()
+          .describe(
+            "Override global sampling setting. When true, filters results using the client's LLM. Defaults to global setting."
           ),
       },
     },
-    async ({ query, max_results = 10, engines }) => {
+    async ({ query, max_results = 10, engines, sampling }) => {
       try {
         // Use provided engines or fall back to configured defaults
         const enginesToUse = engines?.length
           ? engines
           : loadConfig().defaultSearchEngines;
 
-        const results = await executeMultiEngineSearch(
+        // Execute the search
+        let results = await executeMultiEngineSearch(
           query,
           enginesToUse,
           max_results
         );
+
+        // Determine if sampling should be applied
+        // Parameter overrides global setting if provided
+        const shouldSample = sampling !== undefined ? sampling : getSampling();
+        console.debug(`Search: Global sampling=${getSampling()}, Request override=${sampling}, Effective=${shouldSample}`);
+
+        // Apply sampling filter if enabled
+        if (shouldSample && results.length > 0) {
+          console.debug(`Search: invoking sampling filter on ${results.length} results...`);
+          results = await filterResultsWithSampling({
+            query: query.trim(),
+            results,
+            maxResults: max_results,
+            server: mcpServer,
+          });
+          console.debug(`Search: sampling complete. Returning ${results.length} results.`);
+        } else if (shouldSample && results.length === 0) {
+          console.debug("Search: verification enabled but no results to sample.");
+        } else {
+             console.debug("Search: sampling disabled, returning raw results.");
+        }
 
         return createResponse(
           JSON.stringify(
             {
               query: query.trim(),
               engines: enginesToUse,
+              sampling_applied: shouldSample,
               total_results: results.length,
               results,
             },
@@ -106,7 +167,7 @@ export const serverInitializer = (server: McpServer): void => {
   );
 
   // Tool: Visit webpage
-  server.registerTool(
+  mcpServer.registerTool(
     "visit_webpage",
     {
       description: "Visit a webpage and extract its content",

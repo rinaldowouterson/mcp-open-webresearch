@@ -6,4 +6,5 @@ export interface ConfigOverrides {
   proxyUrl?: string;
   engines?: string[];
   port?: number;
+  sampling?: boolean;
 }

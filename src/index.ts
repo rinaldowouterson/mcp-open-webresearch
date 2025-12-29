@@ -1,10 +1,8 @@
 #!/usr/bin/env node
-import "dotenv/config"; // Load environment variables from .env file
 import { captureConsoleDebug, closeWritingStream } from "./utils/logger.js";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { serverInitializer } from "./server/initializer.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import express from "express";
@@ -52,7 +50,10 @@ async function main() {
       "Comma-separated list of search engines",
       (value) => value.split(",")
     )
+    .option("--sampling", "Enable sampling for search results (default)")
+    .option("--no-sampling", "Disable sampling for search results")
     .parse();
+
 
   const options = program.opts();
 
@@ -63,6 +64,7 @@ async function main() {
     cors: options.cors,
     proxyUrl: options.proxy,
     engines: options.engines,
+    sampling: options.sampling,
   };
 
   configureLogger({
@@ -97,7 +99,6 @@ async function main() {
 
   const transports = {
     streamable: {} as Record<string, StreamableHTTPServerTransport>,
-    sse: {} as Record<string, SSEServerTransport>,
   };
 
   app.post("/mcp", async (req, res) => {
@@ -157,29 +158,6 @@ async function main() {
   app.get("/mcp", handleSessionRequest);
 
   app.delete("/mcp", handleSessionRequest);
-
-  // Legacy SSE endpoint for older clients
-  app.get("/sse", async (req, res) => {
-    const transport = new SSEServerTransport("/messages", res);
-    transports.sse[transport.sessionId] = transport;
-
-    res.on("close", () => {
-      delete transports.sse[transport.sessionId];
-    });
-
-    await mcpServer.connect(transport);
-  });
-
-  // Legacy message endpoint for older clients
-  app.post("/messages", async (req, res) => {
-    const sessionId = req.query.sessionId as string;
-    const transport = transports.sse[sessionId];
-    if (transport) {
-      await transport.handlePostMessage(req, res, req.body);
-    } else {
-      res.status(400).send("No transport found for sessionId");
-    }
-  });
 
   const PORT = overrides.port || (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000);
   const transport = new StdioServerTransport();
