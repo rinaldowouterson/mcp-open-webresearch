@@ -13,11 +13,12 @@ I have designed this tool to be robust and respectful of complex network environ
 
 ## Features
 
-- **Multi-Engine Search**: Aggregates results from Bing, DuckDuckGo, and Brave.
+- **Multi-Engine Search**: Aggregates results from Bing, DuckDuckGo, and Brave (incorporating intelligent rate-limiting).
+- **Smart Sampling**: Uses LLM-based filtering to assess relevance and prevent context pollution.
 - **Content Extraction**: Robust webpage visiting and content extraction (`visit_webpage`) using a headless browser.
 - **Enterprise Proxy Support**: Full support for SOCKS5, HTTPS, and HTTP proxies.
 - **Security Conscious**: No external API keys required. CORS and strict environment configuration.
-- **Configurable**: Extensive environment variable control for defaults and debugging.
+- **Configurable**: Extensive configuration via environment variables and CLI arguments.
 - **Docker Ready**: Production and Test images available via GHCR.
 
 ---
@@ -283,7 +284,6 @@ Returns whether LLM-based sampling is currently enabled.
 
 ## Roadmap
 
-- [x] **Context Pollution Prevention**: LLM-based sampling to filter search results, returning only high-quality, relevant content.
 - [ ] **Deep Search**: Implement a deeper search similar to Deep Research offered by Google, OpenAI.
 - [ ] **Keyless GitHub Adapter**: Implement an adapter for fetching and navigating GitHub content without requiring API tokens.
 
