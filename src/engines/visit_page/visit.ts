@@ -1,3 +1,13 @@
+/*
+ * Attribution:
+ * This module includes code adapted from mzxrai/mcp-webresearch (MIT License).
+ * Original Author: mzxrai
+ * 
+ * Modifications by rinaldowouterson:
+ * - Added comprehensive SOCKS5/HTTP proxy support
+ * - Removed Google-specific consent handling
+ * - Refactored into modular architecture
+ */
 import { chromium, Browser, Page, LaunchOptions } from "playwright-chromium";
 import TurndownService from "turndown";
 import { McpError, ErrorCode } from "../../types/mcp-error.js";
