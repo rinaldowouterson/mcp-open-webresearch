@@ -38,6 +38,9 @@ describe("createLaunchOptionsForPlayWright", () => {
         port: null,
         ...proxyConfig,
       },
+      ssl: {
+        ignoreTlsErrors: false,
+      },
     };
   };
 

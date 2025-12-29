@@ -3,11 +3,10 @@ import * as path from "path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as http from "http";
 import * as net from "net";
-import { URL } from "url";
 import * as mockttp from "mockttp";
 import socks5 from "simple-socks";
-import { fetchBingPage } from "../../src/engines/fetch/index.js";
-import axios from "axios";
+// Import all engines
+// Import all engines
 
 // Helper to wait for the socks server to be ready
 const createSocksServer = (port: number, options: any = {}): Promise<any> => {
@@ -58,7 +57,7 @@ const createHttpProxy = (port: number, onConnect: (url: string, headers: http.In
     });
 };
 
-describe("Fetch Proxy E2E Tests", () => {
+describe("Fetch Engines E2E Tests", () => {
     // These tests involve creating local proxies.
     // In Docker, we must ensure we don't conflict with system proxies.
     // We achieve this by explicitly unsetting colliding env vars.
@@ -77,9 +76,6 @@ describe("Fetch Proxy E2E Tests", () => {
     delete process.env.SOCKS5_PROXY;
 
     vi.resetModules();
-    // clear axios defaults
-    axios.defaults.httpAgent = undefined;
-    axios.defaults.httpsAgent = undefined;
     
     // Allow self-signed certs for our local test proxy
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -106,23 +102,14 @@ describe("Fetch Proxy E2E Tests", () => {
 
   it("should route Bing requests through an HTTP proxy", async () => {
     const connectedUrls: string[] = [];
-    // We use mockttp for a smarter proxy that can also mock the upstream response
-    // ensuring we don't need real internet.
-    // We configure it with the TRUSTED test CA so Node/Axios accepts the connection.
     
-    // Determine paths (support both Docker and local fallback)
     const keyPath = process.env.TEST_CA_KEY_PATH || path.join(process.cwd(), 'certs/test/key/test-ca.key');
     const certPath = process.env.TEST_CA_CERT_PATH || path.join(process.cwd(), 'certs/test/test-ca.crt');
-    
-    // Read the certs
     const key = fs.readFileSync(keyPath, 'utf8');
     const cert = fs.readFileSync(certPath, 'utf8');
 
     proxyServer = mockttp.getLocal({
-        https: {
-            key,
-            cert,
-        }
+        https: { key, cert }
     });
     await proxyServer.start();
     
@@ -134,23 +121,15 @@ describe("Fetch Proxy E2E Tests", () => {
 
     process.env.ENABLE_PROXY = "true";
     process.env.HTTP_PROXY = proxyUrl;
-    // Ensure no fallback to system proxy
     delete process.env.HTTPS_PROXY;
 
-    const { fetchBingPage: freshFetchBing } = await import(
+    const { fetchBingPage } = await import(
       "../../src/engines/fetch/index.js"
     );
 
-    // Manual Override: Re-create the agent with rejectUnauthorized: false
-    // relying on the previously imported HttpsProxyAgent
-
-
-    // This will try to connect to bing through our proxy.
-    // It should now SUCCEED because the proxy is using a trusted CA.
-    const result = await freshFetchBing("test query", 0);
+    const result = await fetchBingPage("test query", 0);
     expect(result).toBe("Mock Bing Reached");
     
-    // Check requests seen by our specific mock rule
     const seenRequests = await mockEndpoint.getSeenRequests();
     expect(seenRequests.some((r: any) => r.url.includes("bing.com"))).toBe(true);
   });
@@ -158,14 +137,9 @@ describe("Fetch Proxy E2E Tests", () => {
   it("should authenticate with HTTP proxy", async () => {
     const authHeaders: string[] = [];
     
-    // We can't easily use mockttp for verifying specific auth headers on CONNECT 
-    // without more complex setup, so we stick to the custom implementation 
-    // but ensure it listens on 127.0.0.1 and we handle the upstream connection.
-    // For specific auth testing, we just want to know headers were sent.
-    
     customHttpProxy = await createHttpProxy(0, (url, headers) => {
         if (headers['proxy-authorization']) {
-            authHeaders.push(headers['proxy-authorization']);
+            authHeaders.push(headers['proxy-authorization'] as string);
         }
     });
 
@@ -178,14 +152,12 @@ describe("Fetch Proxy E2E Tests", () => {
     process.env.HTTP_PROXY = proxyUrl;
     delete process.env.HTTPS_PROXY;
 
-    const { fetchBingPage: freshFetchBing } = await import(
+    const { fetchBingPage } = await import(
       "../../src/engines/fetch/index.js"
     );
     
-    // Expected to fail upstream since our custom proxy is basic, 
-    // but we only verify headers here.
     try {
-        await freshFetchBing("test query", 0);
+        await fetchBingPage("test query", 0);
     } catch (e) { /* expected */ }
     
     const expectedAuth = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
@@ -195,13 +167,14 @@ describe("Fetch Proxy E2E Tests", () => {
   it("should route traffic directly when proxy is disabled", async () => {
     process.env.ENABLE_PROXY = "false";
     
-    const { fetchBingPage: freshFetchBing } = await import(
+    // We import dynamically to ensure env vars are picked up
+    const { fetchBingPage } = await import(
         "../../src/engines/fetch/index.js"
     );
     
     // Should work without throwing connectivity errors (assuming internet access)
     // and definitely should NOT try to use our (non-existent) proxy
-    const result = await freshFetchBing("test query", 0);
+    const result = await fetchBingPage("test query", 0);
     expect(result).toBeDefined();
     expect(result.length).toBeGreaterThan(0);
   });
@@ -222,20 +195,70 @@ describe("Fetch Proxy E2E Tests", () => {
     process.env.SOCKS5_PROXY = `socks5://localhost:${port}`;
 
     // Re-import to load config and set agents
-    const { fetchBingPage: freshFetchBing } = await import(
+    const { fetchBingPage } = await import(
       "../../src/engines/fetch/index.js"
     );
 
     // We expect the request to fail (or succeed if internet is available), 
     // but CRITICALLY we want to know if it tried to go through the proxy.
     try {
-        await freshFetchBing("test query", 0);
+        await fetchBingPage("test query", 0);
     } catch (e: any) {
         // If it fails with network error that looks like proxy issue, that's fine.
     }
     
     // STRICT VERIFICATION: The proxy MUST have received a connection attempt.
     expect(proxyConnected).toBe(true);
+  });
+
+  it("should route Brave requests through an HTTP proxy", async () => {
+     // Identical setup to Bing, but testing fetchBravePage (browserMode: true)
+     const keyPath = process.env.TEST_CA_KEY_PATH || path.join(process.cwd(), 'certs/test/key/test-ca.key');
+     const certPath = process.env.TEST_CA_CERT_PATH || path.join(process.cwd(), 'certs/test/test-ca.crt');
+     const key = fs.readFileSync(keyPath, 'utf8');
+     const cert = fs.readFileSync(certPath, 'utf8');
+ 
+     proxyServer = mockttp.getLocal({ https: { key, cert } });
+     await proxyServer.start();
+     
+     const mockEndpoint = await proxyServer.forAnyRequest().forHostname("search.brave.com").thenReply(200, "Mock Brave Reached");
+     const proxyUrl = proxyServer.url.replace("localhost", "127.0.0.1");
+ 
+     process.env.ENABLE_PROXY = "true";
+     process.env.HTTP_PROXY = proxyUrl;
+     
+     const { fetchBravePage } = await import("../../src/engines/fetch/index.js");
+ 
+     const result = await fetchBravePage("test query", 0);
+     expect(result).toBe("Mock Brave Reached");
+     
+     const seenRequests = await mockEndpoint.getSeenRequests();
+     expect(seenRequests.some((r: any) => r.url.includes("brave.com"))).toBe(true);
+  });
+
+  it("should route DuckDuckGo requests through an HTTP proxy", async () => {
+     // Testing fetchDuckDuckSearchPage (browserMode: false)
+     const keyPath = process.env.TEST_CA_KEY_PATH || path.join(process.cwd(), 'certs/test/key/test-ca.key');
+     const certPath = process.env.TEST_CA_CERT_PATH || path.join(process.cwd(), 'certs/test/test-ca.crt');
+     const key = fs.readFileSync(keyPath, 'utf8');
+     const cert = fs.readFileSync(certPath, 'utf8');
+ 
+     proxyServer = mockttp.getLocal({ https: { key, cert } });
+     await proxyServer.start();
+     
+     const mockEndpoint = await proxyServer.forAnyRequest().forHostname("duckduckgo.com").thenReply(200, "Mock DDG Reached");
+     const proxyUrl = proxyServer.url.replace("localhost", "127.0.0.1");
+ 
+     process.env.ENABLE_PROXY = "true";
+     process.env.HTTP_PROXY = proxyUrl;
+     
+     const { fetchDuckDuckSearchPage } = await import("../../src/engines/fetch/index.js");
+ 
+     const result = await fetchDuckDuckSearchPage("test query");
+     expect(result).toBe("Mock DDG Reached");
+     
+     const seenRequests = await mockEndpoint.getSeenRequests();
+     expect(seenRequests.some((r: any) => r.url.includes("duckduckgo.com"))).toBe(true);
   });
 
   it("should authenticate with SOCKS5 proxy", async () => {
@@ -263,12 +286,12 @@ describe("Fetch Proxy E2E Tests", () => {
     process.env.ENABLE_PROXY = "true";
     process.env.SOCKS5_PROXY = `socks5://${username}:${password}@localhost:${port}`;
 
-    const { fetchBingPage: freshFetchBing } = await import(
+    const { fetchBingPage } = await import(
       "../../src/engines/fetch/index.js"
     );
 
     try {
-        await freshFetchBing("test query", 0);
+        await fetchBingPage("test query", 0);
     } catch(e) { 
         // Expected to fail on actual request but auth should have happened
     }
