@@ -115,6 +115,9 @@ export const loadConfig = (overrides?: ConfigOverrides): Readonly<AppConfig> => 
     proxy: loadProxyConfig(overrides),
     enableCors,
     corsOrigin: process.env.CORS_ORIGIN || "*",
+    ssl: {
+      ignoreTlsErrors: process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0",
+    },
   };
 
   return Object.freeze(config);

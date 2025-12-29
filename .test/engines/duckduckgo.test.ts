@@ -10,6 +10,9 @@ vi.mock("../../src/config/index", () => ({
       url: "",
       error: null,
       agent: null
+    },
+    ssl: {
+      ignoreTlsErrors: false
     }
   })
 }));

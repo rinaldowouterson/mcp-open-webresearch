@@ -110,3 +110,6 @@ logs
 
 # Optional memlog directory
 memlog/
+
+# Optional .env file
+.env

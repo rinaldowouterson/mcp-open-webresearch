@@ -55,6 +55,27 @@ docker pull ghcr.io/rinaldowouterson/mcp-open-webresearch:test
 docker pull ghcr.io/rinaldowouterson/mcp-open-webresearch:test
 ```
 
+### Remote Server (Streamable HTTP)
+
+This server supports recent MCP standards (Streamable HTTP) for remote connections.
+
+**Endpoint:** `http://localhost:3000/mcp`
+
+**Configuration:**
+
+To use this with an MCP client (like Claude Desktop), add the following to your `mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "open-webresearch": {
+      "serverUrl": "http://localhost:3000/mcp",
+      "headers": {}
+    }
+  }
+}
+```
+
 ---
 
 ## How to Build and Run
@@ -143,6 +164,7 @@ The server is highly configurable via Environment Variables or a `.env` file.
 | `HTTP_PROXY`             | -                       | HTTP Proxy URL.                         |
 | `HTTPS_PROXY`            | -                       | HTTPS Proxy URL.                        |
 | `SOCKS5_PROXY`           | -                       | SOCKS5 Proxy URL (Highest Priority).    |
+| `SAMPLING`               | `true`                  | Enable LLM-based result filtering.      |
 
 | `WRITE_DEBUG_TERMINAL` | `false` | Output debug logs to stdout. |
 | `WRITE_DEBUG_FILE` | `false` | Write debug logs to file. |
@@ -165,6 +187,8 @@ You can also configure the server using command-line arguments, which override e
 | `--cors`            | Enable CORS                              |
 | `--proxy <url>`     | Proxy URL (supports http, https, socks5) |
 | `--engines <items>` | Comma-separated list of search engines   |
+| `--sampling`        | Enable LLM-based sampling (default)      |
+| `--no-sampling`     | Disable LLM-based sampling               |
 
 Example:
 
@@ -178,7 +202,7 @@ npm start --debug --proxy socks5://localhost:1080
 
 ### `search_web`
 
-Performs a search across configured engines.
+Performs a search across configured engines. When sampling is enabled, uses the client's LLM to filter out irrelevant results.
 
 **Input Schema:**
 
@@ -186,9 +210,17 @@ Performs a search across configured engines.
 {
   "query": "Machine Learning trends 2024",
   "max_results": 10,
-  "engines": ["bing", "brave"] // Optional: override defaults
+  "engines": ["bing", "brave"],
+  "sampling": true
 }
 ```
+
+| Parameter     | Required | Description                                      |
+| :------------ | :------- | :----------------------------------------------- |
+| `query`       | Yes      | Search query string                              |
+| `max_results` | No       | Maximum results (default: 10, max: 50)           |
+| `engines`     | No       | Override default engines                         |
+| `sampling`    | No       | Override global sampling setting for this search |
 
 ### `visit_webpage`
 
@@ -203,7 +235,7 @@ Visits a URL and returns the markdown content. Supports screenshots.
 }
 ```
 
-### `update_default`
+### `set_engines`
 
 Updates the default search engines used by the server and persists them to `.env`.
 
@@ -215,9 +247,31 @@ Updates the default search engines used by the server and persists them to `.env
 }
 ```
 
-### `check_default`
+### `get_engines`
 
 Returns the currently configured default search engines.
+
+**Input Schema:**
+
+```json
+{}
+```
+
+### `set_sampling`
+
+Enables or disables LLM-based sampling for search results. When enabled, search results are evaluated by the client's LLM to filter out irrelevant or low-quality content. Persists to `.env`.
+
+**Input Schema:**
+
+```json
+{
+  "enabled": true
+}
+```
+
+### `get_sampling`
+
+Returns whether LLM-based sampling is currently enabled.
 
 **Input Schema:**
 
@@ -229,7 +283,7 @@ Returns the currently configured default search engines.
 
 ## Roadmap
 
-- [ ] **Context Pollution Prevention**: Implement sampling to further process search results, investigating and aggregating only high-quality results to prevent polluting the LLM context.
+- [x] **Context Pollution Prevention**: LLM-based sampling to filter search results, returning only high-quality, relevant content.
 - [ ] **Deep Search**: Implement a deeper search similar to Deep Research offered by Google, OpenAI.
 - [ ] **Keyless GitHub Adapter**: Implement an adapter for fetching and navigating GitHub content without requiring API tokens.
 

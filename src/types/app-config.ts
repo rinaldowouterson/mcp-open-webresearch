@@ -33,4 +33,8 @@ export interface AppConfig {
   // CORS configuration
   enableCors: boolean;
   corsOrigin: string;
+  // SSL/TLS configuration
+  ssl: {
+    ignoreTlsErrors: boolean;
+  };
 }

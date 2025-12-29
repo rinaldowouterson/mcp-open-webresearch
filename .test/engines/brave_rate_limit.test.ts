@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { executeMultiEngineSearch } from "../../src/server/helpers/executeMultiEngineSearch.js";
 import { searchBrave, isBraveRateLimited, resetLastRequestTime } from "../../src/engines/brave/index.js";
-import * as braveModule from "../../src/engines/brave/index.js";
+import * as fetchModule from "../../src/engines/fetch/index.js";
 import * as bingModule from "../../src/engines/bing/index.js";
 import * as ddgModule from "../../src/engines/duckduckgo/index.js";
 
@@ -44,23 +44,31 @@ describe("Brave Rate Limiting Integration", () => {
         vi.useRealTimers();
     });
 
-    it("should use Brave for the first request", async () => {
-        const results = await executeMultiEngineSearch("test1", ["brave"], 1);
+    it("should use Brave for the first request and handle pagination", async () => {
+        const mockFetch = vi.mocked(fetchModule.fetchBravePage);
+        const search = executeMultiEngineSearch("test1", ["brave"], 5);
+        await vi.runAllTimersAsync();
+        const results = await search;
         
-        expect(results).toHaveLength(1);
-        expect(results[0].engine).toBe("brave");
-        // Verify Brave was called
+        expect(results.some(r => r.engine === "brave")).toBe(true);
+        // Expect 5 calls because our mock returns 1 result per page
+        expect(mockFetch).toHaveBeenCalledTimes(5);
     });
 
     it("should skip Brave and fallback if requested immediately again", async () => {
         // First request sets the timer
-        await executeMultiEngineSearch("test1", ["brave"], 10);
+        // We use a promise wrapper to allow advancing timers while search is running
+        const search1 = executeMultiEngineSearch("test1", ["brave"], 10);
+        await vi.runAllTimersAsync();
+        await search1;
         
         // Advance time only by 1 second (less than 5s cooldown)
         vi.advanceTimersByTime(1000);
 
         // Second request
-        const results = await executeMultiEngineSearch("test2", ["brave"], 10);
+        const search2 = executeMultiEngineSearch("test2", ["brave"], 10);
+        await vi.runAllTimersAsync();
+        const results = await search2;
 
         // verify that fallback happened (Brave skipped, Bing/DDG used)
         const engines = new Set(results.map(r => r.engine));
@@ -71,13 +79,17 @@ describe("Brave Rate Limiting Integration", () => {
 
     it("should use Brave again after cooldown expires", async () => {
          // First request sets the timer
-         await executeMultiEngineSearch("test1", ["brave"], 10);
+         const search1 = executeMultiEngineSearch("test1", ["brave"], 10);
+         await vi.runAllTimersAsync();
+         await search1;
          
          // Advance time by 6 seconds (more than 5s cooldown)
          vi.advanceTimersByTime(6000);
  
          // Second request
-         const results = await executeMultiEngineSearch("test3", ["brave"], 10);
+         const search2 = executeMultiEngineSearch("test3", ["brave"], 10);
+         await vi.runAllTimersAsync();
+         const results = await search2;
  
          expect(results.some(r => r.engine === "brave")).toBe(true);
     });

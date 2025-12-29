@@ -2,7 +2,6 @@ import fs from "fs/promises";
 import path from "path";
 import { SUPPORTED_ENGINES } from "../../types/index.js";
 import { createResponse } from "./createResponse.js";
-import dotenv from "dotenv";
 
 /**
  * Updates default search engines in config and persists to .env file
@@ -41,7 +40,7 @@ export const updateDefaultSearchEngines = async (engines: string[]) => {
     }
 
     await fs.writeFile(envPath, envContents);
-    Object.assign(process.env, dotenv.parse(envContents));
+    process.env.DEFAULT_SEARCH_ENGINES = validEngines.join(",");
 
     return createResponse(
       `Updated default engines to: ${validEngines.join(

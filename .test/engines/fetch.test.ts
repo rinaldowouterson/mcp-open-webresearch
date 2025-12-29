@@ -38,6 +38,9 @@ describe("Proxy Configuration Tests", () => {
         url: "",
         error: null,
         agent: null
+      },
+      ssl: {
+        ignoreTlsErrors: false
       }
     });
   });
@@ -61,6 +64,9 @@ describe("Proxy Configuration Tests", () => {
         url: proxyUrl,
         error: null,
         agent: mockAgentInstance
+      },
+      ssl: {
+        ignoreTlsErrors: false
       }
     });
 
@@ -85,6 +91,9 @@ describe("Proxy Configuration Tests", () => {
         url: "http://proxy.example.com:8080",
         error: null,
         agent: null
+      },
+      ssl: {
+        ignoreTlsErrors: false
       }
     });
 
@@ -105,6 +114,9 @@ describe("Proxy Configuration Tests", () => {
         url: "invalid-proxy-url",
         error: "Invalid proxy configuration",
         agent: null
+      },
+      ssl: {
+        ignoreTlsErrors: false
       }
     });
 
@@ -125,6 +137,9 @@ describe("Proxy Configuration Tests", () => {
         url: "",
         error: null,
         agent: null
+      },
+      ssl: {
+        ignoreTlsErrors: false
       }
     });
 
@@ -145,6 +160,9 @@ describe("Proxy Configuration Tests", () => {
         url: "",
         error: null,
         agent: null
+      },
+      ssl: {
+        ignoreTlsErrors: false
       }
     });
 
