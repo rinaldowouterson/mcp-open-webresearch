@@ -27,9 +27,9 @@ I have designed this tool to be robust and respectful of complex network environ
 
 This project includes work from the following contributors:
 
-- **Manav Kundra**: Initial implementation of the server.
-- **Aasee**: Added multiple search engines and Docker support.
-- **mzxrai**: Core logic for the `visit_page` tool.
+- **[Manav Kundra](https://github.com/mkundra)**: Initial implementation of the server.
+- **[Aasee](https://github.com/Aas-ee)**: Added multiple search engines and Docker support.
+- **[mzxrai](https://github.com/mzxrai)**: Core logic for the `visit_page` tool.
 
 ---
 
