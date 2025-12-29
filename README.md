@@ -52,10 +52,6 @@ docker run -p 3000:3000 ghcr.io/rinaldowouterson/mcp-open-webresearch:latest
 docker pull ghcr.io/rinaldowouterson/mcp-open-webresearch:test
 ```
 
-```bash
-docker pull ghcr.io/rinaldowouterson/mcp-open-webresearch:test
-```
-
 ### Remote Server (Streamable HTTP)
 
 This server supports recent MCP standards (Streamable HTTP) for remote connections.
@@ -133,21 +129,30 @@ Runs the entire test suite inside a Docker container, including proxy simulation
 npm run test:docker
 ```
 
+### Infrastructure Tests
+
+Runs the infrastructure validation tests.
+
+```bash
+npm run test:infrastructure
+```
+
 ---
 
 ## Available Scripts
 
 In the project directory, you can run:
 
-| Command                  | Description                                                                       |
-| :----------------------- | :-------------------------------------------------------------------------------- |
-| `npm run build`          | Compiles the TypeScript source code to JavaScript in the `build/` folder.         |
-| `npm run watch`          | Automatically recompiles the code when you verify changes (useful for dev).       |
-| `npm run inspector`      | Launches a web-based UI to interactively test the MCP server tools and resources. |
-| `npm start`              | Runs the compiled server (must run `npm run build` first).                        |
-| `npm test`               | Runs the unit tests locally.                                                      |
-| `npm run test:docker`    | Builds and runs the full integration test suite inside a Docker container.        |
-| `npm run generate-certs` | Generates self-signed certificates for testing (automatically runs build first).  |
+| Command                       | Description                                                                       |
+| :---------------------------- | :-------------------------------------------------------------------------------- |
+| `npm run build`               | Compiles the TypeScript source code to JavaScript in the `build/` folder.         |
+| `npm run watch`               | Automatically recompiles the code when you verify changes (useful for dev).       |
+| `npm run inspector`           | Launches a web-based UI to interactively test the MCP server tools and resources. |
+| `npm start`                   | Runs the compiled server (must run `npm run build` first).                        |
+| `npm test`                    | Runs the unit tests locally.                                                      |
+| `npm run test:docker`         | Builds and runs the full integration test suite inside a Docker container.        |
+| `npm run test:infrastructure` | Runs the infrastructure validation tests.                                         |
+| `npm run generate-certs`      | Generates self-signed certificates for testing (automatically runs build first).  |
 
 ---
 
