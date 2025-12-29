@@ -199,9 +199,8 @@ The server is highly configurable via Environment Variables or a `.env` file.
 | `HTTPS_PROXY`            | -                       | HTTPS Proxy URL.                        |
 | `SOCKS5_PROXY`           | -                       | SOCKS5 Proxy URL (Highest Priority).    |
 | `SAMPLING`               | `true`                  | Enable LLM-based result filtering.      |
-
-| `WRITE_DEBUG_TERMINAL` | `false` | Output debug logs to stdout. |
-| `WRITE_DEBUG_FILE` | `false` | Write debug logs to file. |
+| `WRITE_DEBUG_TERMINAL`   | `false`                 | Output debug logs to stdout.            |
+| `WRITE_DEBUG_FILE`       | `false`                 | Write debug logs to file.               |
 
 **Proxy Priority Order:**
 
