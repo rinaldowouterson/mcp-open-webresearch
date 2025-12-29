@@ -1,5 +1,6 @@
 import axios from "axios";
 import { loadConfig } from "../../config/index.js";
+import { browserFetch } from "./impersonator.js";
 
 const config = loadConfig();
 if (config.proxy.enabled && config.proxy.isValid && config.proxy.agent) {
@@ -22,39 +23,23 @@ function fetchLogs() {
  */
 
 async function fetchBingPage(query: string, page: number): Promise<string> {
-  const headers = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Charset": "utf-8",
-    "Accept-Encoding": "gzip, deflate, br",
-    Connection: "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-    DNT: "1",
-    Referer: "https://www.bing.com/",
-    "Sec-Fetch-Site": "same-origin",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-User": "?1",
-    "Sec-Fetch-Dest": "document",
-  };
-
   try {
     fetchLogs();
-    const response = await axios.get("https://www.bing.com/search", {
-      params: {
-        q: query,
-        first: 1 + page * 10,
-        mkt: "en-US",
-        setlang: "en-US",
-        cc: "US",
-        ensearch: 1,
-      },
-      headers,
-      timeout: 10000,
+    
+    // NEW: Use impersonatedFetch (impit) instead of axios
+    const params = new URLSearchParams({
+      q: query,
+      first: (1 + page * 10).toString(),
+      mkt: "en-US",
+      setlang: "en-US",
+      cc: "US",
+      ensearch: "1",
     });
 
-    return response.data;
+    const url = `https://www.bing.com/search?${params.toString()}`;
+    console.debug(`fetch: Fetching Bing page (browser-like): ${url}`);
+    
+    return await browserFetch(url);
   } catch (error) {
     throw new Error(
       `Bing search failed: ${
@@ -75,31 +60,16 @@ async function fetchBravePage(query: string, offset: number): Promise<string> {
   try {
     fetchLogs();
 
-    const response = await axios.get("https://search.brave.com/search", {
-      params: {
-        q: query,
-        source: "web",
-        offset,
-      },
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        Connection: "keep-alive",
-        Referer: "https://search.brave.com/",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-Fetch-User": "?1",
-        DNT: "1",
-      },
-      timeout: 10000,
+    const params = new URLSearchParams({
+      q: query,
+      source: "web",
+      offset: offset.toString(),
     });
-    return response.data;
+
+    const url = `https://search.brave.com/search?${params.toString()}`;
+    console.debug(`fetch: Fetching Brave page (browser-like): ${url}`);
+
+    return await browserFetch(url);
   } catch (error) {
     throw new Error(
       `Brave search failed: ${

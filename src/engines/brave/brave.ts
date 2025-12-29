@@ -18,19 +18,36 @@ function parseResults($: cheerio.Root): SearchResult[] {
     .map((index, element) => {
       const resultElement = $(element);
 
-      const title = resultElement.find(".title").text().trim();
-      const url = resultElement.find("a.heading-serpresult").attr("href");
+      const titleElement = resultElement.find(".title");
+      const title = titleElement.text().trim();
+      
+      // The URL is usually on the anchor tag that wraps the title, or a sibling
+      let url = titleElement.closest("a").attr("href");
+      
+      // Fallback: look for the first anchor if title is not inside one
+      if (!url) {
+        url = resultElement.find("a").first().attr("href");
+      }
 
       if (!url || !url.startsWith("http")) {
         return null;
       }
 
-      const description = resultElement
+      let description = resultElement
         .find(".snippet-description")
         .text()
         .trim();
 
-      const source = resultElement.find(".sitename").text().trim();
+      // New selector for browser-like fetch
+      if (!description) {
+        description = resultElement
+          .find(".generic-snippet .content")
+          .text()
+          .trim();
+      }
+
+      const source = resultElement.find(".sitename").text().trim() || 
+                     resultElement.find(".site-name-content").text().trim();
 
       return {
         title,
