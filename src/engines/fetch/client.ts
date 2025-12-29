@@ -1,5 +1,6 @@
 import { Impit } from 'impit';
 import { loadConfig } from '../../config/index.js';
+import { SmartFetchOptions } from '../../types/index.js';
 
 const config = loadConfig();
 
@@ -17,13 +18,6 @@ const standardClient = new Impit({
   ignoreTlsErrors: config.ssl.ignoreTlsErrors,
 });
 
-export interface SmartFetchOptions {
-  /**
-   * If true, mimics a real Chrome browser (TLS fingerprinting, auto User-Agent). Best for Bing, Brave.
-   * If false or undefined, uses a standard HTTP client (no fingerprinting). Best for DuckDuckGo, APIs.
-   */
-  browserMode?: boolean;
-}
 
 /**
  * A unified fetch utility that chooses the best strategy for the target.

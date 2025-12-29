@@ -13,3 +13,4 @@ export { ErrorCode, McpError } from "./mcp-error.js";
 export type { SearchResult } from "./search.js";
 
 export type { ConfigOverrides } from "./ConfigOverrides.js";
+export type { SmartFetchOptions } from "./smart-fetch-options.js";
