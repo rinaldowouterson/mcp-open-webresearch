@@ -1,6 +1,7 @@
 import { fetchBravePage } from "../../fetch/index.js";
 import * as cheerio from "cheerio";
 import { SearchResult } from "../../../types/search.js";
+import { cooldown, touch } from "../throttle.js";
 
 const MAX_PAGES = 10;
 const RESULTS_PER_PAGE = 10;
@@ -77,12 +78,12 @@ export async function searchBrave(
     try {
       const offset = page * RESULTS_PER_PAGE;
       
-      // Smart delay: ensure at least 1 second between paginated requests
+      // Wait for page cooldown between pagination requests
       if (page > 0) {
-        await waitForBravePageCooldown();
+        await cooldown("brave");
       }
 
-      lastRequestTime = Date.now();
+      touch("brave");
       const html = await fetchBravePage(query, offset);
       const $ = cheerio.load(html);
       const pageResults = parseResults($);
@@ -115,31 +116,5 @@ export async function searchBrave(
     }
   }
 
-  // Update last request time after a successful operational attempt (even if it failed per page)
-  lastRequestTime = Date.now();
   return results.slice(0, limit);
 }
-
-// Track the last time Brave was used
-let lastRequestTime = 0;
-const BRAVE_COOLDOWN_MS = 5000;
-const BRAVE_PAGE_DELAY_MS = 1000;
-
-/**
- * Waits for the mandatory cooldown between Brave search result pages
- */
-async function waitForBravePageCooldown() {
-  const delay = BRAVE_PAGE_DELAY_MS - (Date.now() - lastRequestTime);
-  if (delay > 0) {
-    await new Promise((resolve) => setTimeout(resolve, delay));
-  }
-}
-
-export function isBraveRateLimited(): boolean {
-  const timeSinceLastRequest = Date.now() - lastRequestTime;
-  return timeSinceLastRequest < BRAVE_COOLDOWN_MS;
-}
-
-export const resetLastRequestTime = () => {
-  lastRequestTime = 0;
-};
