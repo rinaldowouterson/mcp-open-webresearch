@@ -25,8 +25,8 @@ export interface ProxyConfig {
 }
 
 export interface AppConfig {
-  // Search engine configuration (array of engines to use by default)
-  defaultSearchEngines: ("bing" | "duckduckgo" | "brave")[];
+  // Search engine configuration (array of engine names to use by default)
+  defaultSearchEngines: string[];
   // Proxy configuration
   proxy: ProxyConfig;
   // CORS configuration

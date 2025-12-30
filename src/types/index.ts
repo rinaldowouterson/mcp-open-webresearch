@@ -1,4 +1,5 @@
-export { SUPPORTED_ENGINES, type SupportedEngine } from "./SupportedEngine.js";
+// SearchEngine types for plug-and-play engine discovery
+export type { SearchResult, SearchFn, SearchEngine } from "./search.js";
 
 export type {
   AppConfig,
@@ -8,9 +9,6 @@ export type {
 } from "./app-config.js";
 
 export { ErrorCode, McpError } from "./mcp-error.js";
-
-// Search result types
-export type { SearchResult } from "./search.js";
 
 export type { ConfigOverrides } from "./ConfigOverrides.js";
 export type { SmartFetchOptions } from "./smart-fetch-options.js";
