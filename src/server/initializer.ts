@@ -33,9 +33,13 @@ export const serverInitializer = (mcpServer: McpServer): void => {
           .min(1)
           .refine(
             (arr) => arr.every((e) => availableEngines.includes(e)),
-            `Invalid engine. Available engines are discovered at startup.`
+            `Invalid engine. Available: ${availableEngines.join(", ")}`
           )
-          .describe("List of search engines to set as default"),
+          .describe(
+            `List of search engines to set as default. Available: ${availableEngines.join(
+              ", "
+            )}`
+          ),
       },
     },
     async ({ engines }) => {
