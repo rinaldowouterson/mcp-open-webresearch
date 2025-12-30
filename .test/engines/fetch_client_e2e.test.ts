@@ -1,3 +1,7 @@
+/**
+ * Fetch Client E2E Tests
+ * Tests real network requests through proxies and auth.
+ */
 import * as fs from "fs";
 import * as path from "path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";

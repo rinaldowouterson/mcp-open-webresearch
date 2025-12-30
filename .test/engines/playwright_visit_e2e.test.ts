@@ -1,3 +1,7 @@
+/**
+ * Playwright Visit E2E Tests
+ * Tests the visitPage function with a real browser instance.
+ */
 import {
   test,
   expect,
@@ -13,10 +17,10 @@ import {
 } from "../../src/engines/visit_page/visit.js";
 import { McpError, ErrorCode } from "../../src/types/mcp-error.js";
 import * as http from "http";
-import { loadConfig } from "../../src/config/loader.js";
+import { loadConfig } from "../../src/config/index.js";
 
 // Mock the config loader
-vi.mock("../../src/config/loader.js", () => ({
+vi.mock("../../src/config/index.js", () => ({
   loadConfig: vi.fn().mockReturnValue({
     proxy: {
       enabled: false,

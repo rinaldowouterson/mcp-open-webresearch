@@ -9,17 +9,21 @@
 
 Proxy-aware Model Context Protocol (MCP) server for web searching and content extraction.
 
-I have designed this tool to be robust and respectful of complex network environments, including support for SOCKS and HTTP proxies. While I have done my best to implement secure practices (no API keys, strict CORS, non-root Docker execution), please rigorously evaluate it for your usecase.
+Designed to be robust and compatible with various network environments, including those using SOCKS and HTTP proxies.
 
 ## Features
 
-- **Multi-Engine Search**: Aggregates results from Bing, DuckDuckGo, and Brave (incorporating intelligent rate-limiting).
-- **Smart Sampling**: Uses LLM-based filtering to assess relevance and prevent context pollution.
-- **Content Extraction**: Robust webpage visiting and content extraction (`visit_webpage`) using a headless browser.
-- **Enterprise Proxy Support**: Full support for SOCKS5, HTTPS, and HTTP proxies.
-- **Security Conscious**: No external API keys required. CORS and strict environment configuration.
-- **Configurable**: Extensive configuration via environment variables and CLI arguments.
-- **Docker Ready**: Production and Test images available via GHCR.
+- **Dynamic Engine Discovery**: Engines are loaded dynamically from the `src/engines/search/` directory. Adding a new engine requires only a new folder and file, without modifying core logic.
+- **Multi-Engine Search**: Aggregates results from Bing, DuckDuckGo, and Brave.
+- **Centralized Throttling**: functionality to manage rate limits (search and pagination cooldowns) across different engines.
+- **Smart Fetch**: Configurable fetching utility (`impit`) with two modes:
+  - **Browser Mode**: Emulates a modern browser (User-Agent, Client Hints, Headers) for compatibility with sites requiring browser-like requests.
+  - **Standard Mode**: Uses a minimal HTTP client profile (no custom User-Agent) for environments where browser masquerading is not desired.
+- **Result Sampling**: Optional LLM-based filtering to assess result relevance.
+- **Content Extraction**: Webpage visiting and markdown extraction tool (`visit_webpage`) using a headless browser.
+- **Proxy Support**: Full support for SOCKS5, HTTPS, and HTTP proxies.
+- **Configuration**: Configurable via environment variables and CLI arguments.
+- **Deployment**: Docker images available for production and testing.
 
 ---
 
@@ -37,8 +41,6 @@ This project includes work from the following contributors:
 
 ### Docker (Recommended)
 
-The easiest way to run the server is via the provided Docker images.
-
 **Latest Stable Release:**
 
 ```bash
@@ -52,14 +54,14 @@ docker run -p 3000:3000 ghcr.io/rinaldowouterson/mcp-open-webresearch:latest
 docker pull ghcr.io/rinaldowouterson/mcp-open-webresearch:test
 ```
 
-### Local Installation (Stdio)
+### Local Installation
 
-To run the server locally (e.g., in Claude Desktop or Cline), use the following configuration.
+To run the server locally (e.g., in Claude Desktop or Cline):
 
 > [!NOTE]
-> Make sure to replace `/absolute/path/to/project` with the actual path to where you cloned this repository.
+> Replace `/absolute/path/to/project` with your actual project path.
 
-**File:** `mcp_config.json` (or typically `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS)
+**Configuration (`mcp_config.json`):**
 
 ```json
 {
@@ -82,13 +84,9 @@ To run the server locally (e.g., in Claude Desktop or Cline), use the following 
 
 ### Remote Server (Streamable HTTP)
 
-This server supports recent MCP standards (Streamable HTTP) for remote connections.
-
 **Endpoint:** `http://localhost:3000/mcp`
 
 **Configuration:**
-
-To use this with an MCP client (like Claude Desktop), add the following to your `mcp_config.json`:
 
 ```json
 {
@@ -103,63 +101,81 @@ To use this with an MCP client (like Claude Desktop), add the following to your 
 
 ---
 
-## How to Build and Run
+## Developer Guide: Adding New Engines
+
+To add a new search engine:
+
+1.  **Create Directory**: `src/engines/search/{engine_name}/`
+2.  **Implement Logic**: Create `{engine_name}.ts` with the fetching/parsing logic.
+3.  **Export Interface**: Create `index.ts` exporting the `SearchEngine` interface:
+
+    ```typescript
+    import type { SearchEngine } from "../../../types/search.js";
+    import { searchMyEngine } from "./my_engine.js";
+    import { isThrottled } from "../../throttle.js"; // Optional
+
+    export const engine: SearchEngine = {
+      name: "my_engine",
+      search: searchMyEngine,
+      isRateLimited: () => isThrottled("my_engine"),
+    };
+    ```
+
+4.  **Restart**: The server will automatically discover and load the new engine.
+
+---
+
+## Build and Run
 
 ### Locally
 
 ```bash
-# 1. Clone the repository
+# 1. Clone
 git clone https://github.com/rinaldowouterson/mcp-open-webresearch.git
 cd mcp-open-webresearch
 
-# 2. Install dependencies
+# 2. Install
 npm install
 
-# 3. Build and Start
+# 3. Build & Start
 npm run build
 npm start
 ```
 
-### Docker (Production)
+### Docker
 
 ```bash
+# Production
 docker build -t mcp-websearch .
 docker run -p 3000:3000 mcp-websearch
-```
 
-### Docker (Testing)
-
-Run the full test suite in a container:
-
-```bash
+# Testing
 npm run test:docker
 ```
 
 ---
 
-## How to Test
+## Testing
 
-This project includes a comprehensive test suite. Choose the appropriate command based on your needs.
+### Unit & E2E Tests
 
-### Unit Tests
-
-Runs all unit and integration tests locally using Vitest.
+Uses **Vitest** for testing. Includes dynamic contract tests for all discovered engines.
 
 ```bash
 npm test
 ```
 
-### Docker Tests (Quick)
+### Compliance Tests
 
-A fast way to run the full test suite inside a Docker container. Useful for verifying changes in an isolated environment.
+Verifies the "Smart Fetch" behavior (User-Agent headers) usage using a local mock server.
 
 ```bash
-npm run test:docker
+npm run test .test/engines/smart_fetch_mode.test.ts
 ```
 
-### Infrastructure Validation (Full)
+### Infrastructure Validation
 
-Runs a comprehensive infrastructure check via Vitest. This builds and validates both the **production** and **test** Docker images, with proper timeout handling and cleanup.
+Validates Docker image builds and basic functionality.
 
 ```bash
 npm run test:infrastructure
@@ -169,65 +185,51 @@ npm run test:infrastructure
 
 ## Available Scripts
 
-In the project directory, you can run:
-
-| Command                       | Description                                                                        |
-| :---------------------------- | :--------------------------------------------------------------------------------- |
-| `npm run build`               | Compiles the TypeScript source code to JavaScript in the `build/` folder.          |
-| `npm run watch`               | Automatically recompiles the code when you verify changes (useful for dev).        |
-| `npm run inspector`           | Launches a web-based UI to interactively test the MCP server tools and resources.  |
-| `npm start`                   | Runs the compiled server (must run `npm run build` first).                         |
-| `npm test`                    | Runs unit and integration tests locally.                                           |
-| `npm run test:docker`         | Runs the test suite in Docker (quick, isolated verification).                      |
-| `npm run test:infrastructure` | Full infrastructure validation (builds and tests both production and test images). |
-| `npm run generate-certs`      | Generates self-signed certificates for testing (automatically runs build first).   |
+| Command                       | Description                                     |
+| :---------------------------- | :---------------------------------------------- |
+| `npm run build`               | Compiles TypeScript to `build/` folder.         |
+| `npm run watch`               | Recompiles on file changes.                     |
+| `npm run inspector`           | Launches MCP inspector UI.                      |
+| `npm start`                   | Runs the compiled server.                       |
+| `npm test`                    | Runs local tests.                               |
+| `npm run test:docker`         | Runs tests in Docker container.                 |
+| `npm run test:infrastructure` | Validates docker images.                        |
+| `npm run generate-certs`      | Generates self-signed certificates for testing. |
 
 ---
 
 ## Configuration
 
-The server is highly configurable via Environment Variables or a `.env` file.
+Configuration is managed via Environment Variables or CLI arguments.
 
-| Variable                 | Default                 | Description                             |
-| :----------------------- | :---------------------- | :-------------------------------------- |
-| `PORT`                   | `3000`                  | Port to listen on.                      |
-| `ENABLE_CORS`            | `false`                 | Enable/Disable CORS.                    |
-| `CORS_ORIGIN`            | `*`                     | Allowed CORS origin.                    |
-| `DEFAULT_SEARCH_ENGINES` | `bing,duckduckgo,brave` | Comma-separated list of engines to use. |
-| `ENABLE_PROXY`           | `false`                 | Global switch to enable proxy usage.    |
-| `HTTP_PROXY`             | -                       | HTTP Proxy URL.                         |
-| `HTTPS_PROXY`            | -                       | HTTPS Proxy URL.                        |
-| `SOCKS5_PROXY`           | -                       | SOCKS5 Proxy URL (Highest Priority).    |
-| `SAMPLING`               | `true`                  | Enable LLM-based result filtering.      |
-| `WRITE_DEBUG_TERMINAL`   | `false`                 | Output debug logs to stdout.            |
-| `WRITE_DEBUG_FILE`       | `false`                 | Write debug logs to file.               |
+| Variable                 | Default                 | Description                          |
+| :----------------------- | :---------------------- | :----------------------------------- |
+| `PORT`                   | `3000`                  | Server port.                         |
+| `ENABLE_CORS`            | `false`                 | Enable CORS.                         |
+| `CORS_ORIGIN`            | `*`                     | Allowed CORS origin.                 |
+| `DEFAULT_SEARCH_ENGINES` | `bing,duckduckgo,brave` | Default engines list.                |
+| `ENABLE_PROXY`           | `false`                 | Enable proxy support.                |
+| `HTTP_PROXY`             | -                       | HTTP Proxy URL.                      |
+| `HTTPS_PROXY`            | -                       | HTTPS Proxy URL.                     |
+| `SOCKS5_PROXY`           | -                       | SOCKS5 Proxy URL (Highest Priority). |
+| `SAMPLING`               | `true`                  | Enable result sampling.              |
+| `WRITE_DEBUG_TERMINAL`   | `false`                 | Log debug output to stdout.          |
+| `WRITE_DEBUG_FILE`       | `false`                 | Log debug output to file.            |
 
-**Proxy Priority Order:**
+### CLI Arguments
 
-1. `SOCKS5_PROXY`
-2. `HTTPS_PROXY`
-3. `HTTP_PROXY`
+CLI arguments override environment variables.
 
-### Command Line Arguments
-
-You can also configure the server using command-line arguments, which override environment variables:
-
-| Argument            | Description                              |
-| :------------------ | :--------------------------------------- |
-| `--port <number>`   | Port to listen on                        |
-| `--debug`           | Enable debug logging to stdout           |
-| `--debug-file`      | Enable debug logging to file             |
-| `--cors`            | Enable CORS                              |
-| `--proxy <url>`     | Proxy URL (supports http, https, socks5) |
-| `--engines <items>` | Comma-separated list of search engines   |
-| `--sampling`        | Enable LLM-based sampling (default)      |
-| `--no-sampling`     | Disable LLM-based sampling               |
-
-Example:
-
-```bash
-npm start --debug --proxy socks5://localhost:1080
-```
+| Argument            | Description                      |
+| :------------------ | :------------------------------- |
+| `--port <number>`   | Port to listen on.               |
+| `--debug`           | Enable debug logging (stdout).   |
+| `--debug-file`      | Enable debug logging (file).     |
+| `--cors`            | Enable CORS.                     |
+| `--proxy <url>`     | Proxy URL (http, https, socks5). |
+| `--engines <items>` | Comma-separated list of engines. |
+| `--sampling`        | Enable sampling.                 |
+| `--no-sampling`     | Disable sampling.                |
 
 ---
 
@@ -235,31 +237,24 @@ npm start --debug --proxy socks5://localhost:1080
 
 ### `search_web`
 
-Performs a search across configured engines. When sampling is enabled, uses the client's LLM to filter out irrelevant results.
+Performs a search across configured engines.
 
-**Input Schema:**
+**Input:**
 
 ```json
 {
-  "query": "Machine Learning trends 2024",
+  "query": "search query",
   "max_results": 10,
   "engines": ["bing", "brave"],
   "sampling": true
 }
 ```
 
-| Parameter     | Required | Description                                      |
-| :------------ | :------- | :----------------------------------------------- |
-| `query`       | Yes      | Search query string                              |
-| `max_results` | No       | Maximum results (default: 10, max: 50)           |
-| `engines`     | No       | Override default engines                         |
-| `sampling`    | No       | Override global sampling setting for this search |
-
 ### `visit_webpage`
 
-Visits a URL and returns the markdown content. Supports screenshots.
+Visits a URL and returns markdown content.
 
-**Input Schema:**
+**Input:**
 
 ```json
 {
@@ -270,9 +265,9 @@ Visits a URL and returns the markdown content. Supports screenshots.
 
 ### `set_engines`
 
-Updates the default search engines used by the server and persists them to `.env`.
+Updates default search engines.
 
-**Input Schema:**
+**Input:**
 
 ```json
 {
@@ -282,19 +277,13 @@ Updates the default search engines used by the server and persists them to `.env
 
 ### `get_engines`
 
-Returns the currently configured default search engines.
-
-**Input Schema:**
-
-```json
-{}
-```
+Returns configured search engines.
 
 ### `set_sampling`
 
-Enables or disables LLM-based sampling for search results. When enabled, search results are evaluated by the client's LLM to filter out irrelevant or low-quality content. Persists to `.env`.
+Enables or disables result sampling.
 
-**Input Schema:**
+**Input:**
 
 ```json
 {
@@ -304,23 +293,17 @@ Enables or disables LLM-based sampling for search results. When enabled, search 
 
 ### `get_sampling`
 
-Returns whether LLM-based sampling is currently enabled.
-
-**Input Schema:**
-
-```json
-{}
-```
+Returns current sampling status.
 
 ---
 
 ## Roadmap
 
-- [ ] **Deep Search**: Implement a deeper search similar to Deep Research offered by Google, OpenAI.
-- [ ] **Keyless GitHub Adapter**: Implement an adapter for fetching and navigating GitHub content without requiring API tokens.
+- [ ] **Deep Search**: Implement deeper search capabilities.
+- [ ] **Keyless GitHub Adapter**: Implement adapter for GitHub content access.
 
 ---
 
 ## License
 
-This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+Apache License 2.0. See [LICENSE](LICENSE).

@@ -1,3 +1,7 @@
+/**
+ * Fetch Client Unit Tests
+ * Tests configuration logic, proxy setup, and browser mode selection.
+ */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock config loader

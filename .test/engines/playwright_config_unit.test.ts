@@ -1,3 +1,7 @@
+/**
+ * Playwright Configuration Unit Tests
+ * Tests launch options, proxy configuration, and argument generation.
+ */
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { createLaunchOptionsForPlayWright } from "../../src/engines/visit_page/visit.js";
 import { loadConfig } from "../../src/config/index.js";
