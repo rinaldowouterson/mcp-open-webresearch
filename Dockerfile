@@ -17,6 +17,7 @@ WORKDIR /app
 # Copy package files for caching
 COPY package*.json ./
 # Install all deps (incl. dev) for build
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN npm ci && npm cache clean --force
 
 # Copy source and build TS to JS
