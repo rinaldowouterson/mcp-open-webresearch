@@ -1,9 +1,9 @@
 import * as cheerio from "cheerio";
-import { SearchResult } from "../../types/search.js";
+import { SearchResult } from "../../../types/search.js";
 import {
   fetchDuckDuckApiResults,
   fetchDuckDuckSearchPage,
-} from "../fetch/index.js";
+} from "../../fetch/index.js";
 
 const rawApiToJson = (data: string): any[] | null => {
   const match = data.match(/DDG\.pageLayout\.load\('d',\s*(\[.*?\])\s*\);/s);

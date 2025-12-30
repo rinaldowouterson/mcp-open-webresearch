@@ -1,6 +1,6 @@
-import { fetchBravePage } from "../fetch/index.js";
+import { fetchBravePage } from "../../fetch/index.js";
 import * as cheerio from "cheerio";
-import { SearchResult } from "../../types/search.js";
+import { SearchResult } from "../../../types/search.js";
 
 const MAX_PAGES = 10;
 const RESULTS_PER_PAGE = 10;
