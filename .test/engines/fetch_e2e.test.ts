@@ -5,8 +5,7 @@ import * as http from "http";
 import * as net from "net";
 import * as mockttp from "mockttp";
 import socks5 from "simple-socks";
-// Import all engines
-// Import all engines
+import { ensureTestCerts } from "../utils/testCerts.js";
 
 // Helper to wait for the socks server to be ready
 const createSocksServer = (port: number, options: any = {}): Promise<any> => {
@@ -103,10 +102,7 @@ describe("Fetch Engines E2E Tests", () => {
   it("should route Bing requests through an HTTP proxy", async () => {
     const connectedUrls: string[] = [];
     
-    const keyPath = process.env.TEST_CA_KEY_PATH || path.join(process.cwd(), 'certs/test/key/test-ca.key');
-    const certPath = process.env.TEST_CA_CERT_PATH || path.join(process.cwd(), 'certs/test/test-ca.crt');
-    const key = fs.readFileSync(keyPath, 'utf8');
-    const cert = fs.readFileSync(certPath, 'utf8');
+    const { key, cert } = ensureTestCerts();
 
     proxyServer = mockttp.getLocal({
         https: { key, cert }
@@ -213,10 +209,7 @@ describe("Fetch Engines E2E Tests", () => {
 
   it("should route Brave requests through an HTTP proxy", async () => {
      // Identical setup to Bing, but testing fetchBravePage (browserMode: true)
-     const keyPath = process.env.TEST_CA_KEY_PATH || path.join(process.cwd(), 'certs/test/key/test-ca.key');
-     const certPath = process.env.TEST_CA_CERT_PATH || path.join(process.cwd(), 'certs/test/test-ca.crt');
-     const key = fs.readFileSync(keyPath, 'utf8');
-     const cert = fs.readFileSync(certPath, 'utf8');
+     const { key, cert } = ensureTestCerts();
  
      proxyServer = mockttp.getLocal({ https: { key, cert } });
      await proxyServer.start();
@@ -238,10 +231,7 @@ describe("Fetch Engines E2E Tests", () => {
 
   it("should route DuckDuckGo requests through an HTTP proxy", async () => {
      // Testing fetchDuckDuckSearchPage (browserMode: false)
-     const keyPath = process.env.TEST_CA_KEY_PATH || path.join(process.cwd(), 'certs/test/key/test-ca.key');
-     const certPath = process.env.TEST_CA_CERT_PATH || path.join(process.cwd(), 'certs/test/test-ca.crt');
-     const key = fs.readFileSync(keyPath, 'utf8');
-     const cert = fs.readFileSync(certPath, 'utf8');
+     const { key, cert } = ensureTestCerts();
  
      proxyServer = mockttp.getLocal({ https: { key, cert } });
      await proxyServer.start();

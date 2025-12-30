@@ -1,6 +1,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { searchBrave } from "../../src/engines/brave/brave.js";
+import { searchBrave } from "../../src/engines/search/brave/brave.js";
 import * as fetchModule from "../../src/engines/fetch/index.js";
 
 // Mock the dependencies

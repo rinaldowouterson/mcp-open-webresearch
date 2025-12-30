@@ -1,5 +1,5 @@
 import { test, expect, vi } from "vitest";
-import { searchDuckDuckGo } from "../../src/engines/duckduckgo";
+import { searchDuckDuckGo } from "../../src/engines/search/duckduckgo/duckduckgo.js";
 
 // Mock the config loader
 vi.mock("../../src/config/index", () => ({

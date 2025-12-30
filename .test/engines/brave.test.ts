@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { searchBrave } from "../../src/engines/brave";
+import { searchBrave } from "../../src/engines/search/brave/brave.js";
 
 // Mock the config loader
 vi.mock("../../src/config/index", () => ({

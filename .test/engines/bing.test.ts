@@ -1,5 +1,5 @@
 import { test, expect, vi, beforeEach } from "vitest";
-import { searchBing } from "../../src/engines/bing";
+import { searchBing } from "../../src/engines/search/bing/bing.js";
 import { loadConfig } from "../../src/config/";
 
 // Mock the config loader
