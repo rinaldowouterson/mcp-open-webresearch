@@ -2,7 +2,7 @@
 import { captureConsoleDebug, closeWritingStream } from "./utils/logger.js";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { serverInitializer } from "./server/initializer.js";
+import { serverInitializer, initEngineRegistry } from "./server/initializer.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import express from "express";
@@ -82,6 +82,9 @@ async function main() {
     name: "open-webresearch",
     version: "25.12.28",
   });
+
+  // Initialize engine registry before registering tools
+  await initEngineRegistry();
 
   serverInitializer(mcpServer);
 

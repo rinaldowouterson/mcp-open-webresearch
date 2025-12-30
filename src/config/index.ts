@@ -100,12 +100,11 @@ const loadProxyConfig = (overrides?: ConfigOverrides): ProxyConfig => {
 };
 
 export const loadConfig = (overrides?: ConfigOverrides): Readonly<AppConfig> => {
-  const defaultSearchEnginesRaw = overrides?.engines || (process.env.DEFAULT_SEARCH_ENGINES ? process.env.DEFAULT_SEARCH_ENGINES.split(",") : ["bing", "duckduckgo", "brave"]);
-  
-  const defaultSearchEngines = defaultSearchEnginesRaw.filter(
-          (e): e is AppConfig["defaultSearchEngines"][number] =>
-            ["bing", "duckduckgo", "brave"].includes(e)
-        ) as AppConfig["defaultSearchEngines"];
+  // Engine validation happens at runtime via registry - just parse the config here
+  const defaultSearchEngines = overrides?.engines || 
+    (process.env.DEFAULT_SEARCH_ENGINES 
+      ? process.env.DEFAULT_SEARCH_ENGINES.split(",").map(e => e.trim())
+      : ["bing", "duckduckgo", "brave"]);
 
   const enableCors = overrides?.cors ?? process.env.ENABLE_CORS === "true";
 

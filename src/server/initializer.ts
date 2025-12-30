@@ -2,13 +2,24 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { visitPage } from "../engines/visit_page/visit.js";
 import { z } from "zod";
 import { loadConfig } from "../config/index.js";
-import { SUPPORTED_ENGINES } from "../types/index.js";
+import { getEngineNames } from "../engines/search/registry.js";
 import { executeMultiEngineSearch } from "./helpers/executeMultiEngineSearch.js";
 import { updateDefaultSearchEngines } from "./helpers/updateDefaultSearchEngines.js";
 import { updateSampling } from "./helpers/updateSampling.js";
 import { getSampling, getSamplingResponse } from "./helpers/getSampling.js";
 import { filterResultsWithSampling } from "./helpers/filterResultsWithSampling.js";
 import { createResponse } from "./helpers/createResponse.js";
+
+// Cache for available engine names (populated at startup)
+let availableEngines: string[] = [];
+
+/**
+ * Initialize the engine registry cache. Call before registering tools.
+ */
+export const initEngineRegistry = async (): Promise<void> => {
+  availableEngines = await getEngineNames();
+  console.debug(`Available engines: ${availableEngines.join(", ")}`);
+};
 
 export const serverInitializer = (mcpServer: McpServer): void => {
   // Tool: Update default search engines
@@ -18,9 +29,13 @@ export const serverInitializer = (mcpServer: McpServer): void => {
       description: "Update default search engines and persist to .env",
       inputSchema: {
         engines: z
-          .array(z.enum(SUPPORTED_ENGINES))
+          .array(z.string())
           .min(1)
-          .describe("Comma-separated list of search engines to set as default"),
+          .refine(
+            (arr) => arr.every((e) => availableEngines.includes(e)),
+            `Invalid engine. Available engines are discovered at startup.`
+          )
+          .describe("List of search engines to set as default"),
       },
     },
     async ({ engines }) => {
@@ -96,11 +111,11 @@ export const serverInitializer = (mcpServer: McpServer): void => {
             "Maximum number of results to return. Current default is 10. Maximum is 50. It's distributed across engines."
           ),
         engines: z
-          .array(z.enum(SUPPORTED_ENGINES))
+          .array(z.string())
           .min(1)
           .optional()
           .describe(
-            `Engines to use. Current default is ${loadConfig().defaultSearchEngines}`
+            `Engines to use. Available: ${availableEngines.join(", ")}`
           ),
         sampling: z
           .boolean()

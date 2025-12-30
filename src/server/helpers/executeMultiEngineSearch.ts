@@ -1,15 +1,5 @@
-import { SearchResult, SupportedEngine } from "../../types/index.js";
-import { searchBing } from "../../engines/bing/index.js";
-import { searchDuckDuckGo } from "../../engines/duckduckgo/index.js";
-import { searchBrave, isBraveRateLimited } from "../../engines/brave/index.js";
-export const availableSearchEngines: Record<
-  SupportedEngine,
-  (query: string, limit: number) => Promise<SearchResult[]>
-> = {
-  bing: searchBing,
-  duckduckgo: searchDuckDuckGo,
-  brave: searchBrave,
-};
+import { SearchResult } from "../../types/index.js";
+import { getEngines } from "../../engines/search/registry.js";
 
 /**
  * Distributes search limit across multiple engines
@@ -27,7 +17,7 @@ export const distributeSearchLimit = (
 };
 
 /**
- * Executes search across specified engines
+ * Executes search across specified engines using dynamic registry
  */
 export const executeMultiEngineSearch = async (
   query: string,
@@ -37,37 +27,56 @@ export const executeMultiEngineSearch = async (
   const cleanQuery = query.trim();
   if (!cleanQuery) throw new Error("Search query cannot be empty");
 
-  // Check for Brave rate limiting
-  const enginesToUse = [...engines];
-  const braveIndex = enginesToUse.indexOf("brave");
+  const allEngines = await getEngines();
 
-  if (braveIndex !== -1 && isBraveRateLimited()) {
-    console.debug("Brave rate limited, skipping...");
-    enginesToUse.splice(braveIndex, 1);
+  // Filter out rate-limited engines
+  const availableEngines = engines.filter((name) => {
+    const engine = allEngines.get(name);
+    if (!engine) {
+      console.debug(`Engine "${name}" not found in registry, skipping`);
+      return false;
+    }
+    if (engine.isRateLimited()) {
+      console.debug(`Engine "${name}" is rate-limited, skipping`);
+      return false;
+    }
+    return true;
+  });
 
-    // If no engines left (e.g. user only asked for Brave), fallback to Bing and DDG
-    if (enginesToUse.length === 0) {
-      console.debug("Falling back to Bing and DuckDuckGo");
-      enginesToUse.push("bing", "duckduckgo");
+  // Fallback if all requested engines are unavailable
+  if (availableEngines.length === 0) {
+    console.debug("All requested engines unavailable, using first available engine");
+    const firstAvailable = Array.from(allEngines.entries())
+      .find(([_, e]) => !e.isRateLimited());
+    if (firstAvailable) {
+      availableEngines.push(firstAvailable[0]);
+    } else {
+      console.debug("No engines available");
+      return [];
     }
   }
 
   // Distribute search limit across engines
-  const engineLimits = distributeSearchLimit(maxResults, enginesToUse.length);
+  const engineLimits = distributeSearchLimit(maxResults, availableEngines.length);
 
-  const searchResultPromises = enginesToUse.map((engine, index) => {
-    const currentSearchEngine =
-      availableSearchEngines[engine as SupportedEngine];
-    return currentSearchEngine
-      ? currentSearchEngine(cleanQuery, engineLimits[index])
-      : Promise.resolve([]);
+  // Fan-out: Execute all searches in parallel
+  const searchPromises = availableEngines.map((name, index) => {
+    const engine = allEngines.get(name)!;
+    return engine.search(cleanQuery, engineLimits[index]);
   });
 
-  try {
-    const searchResults = await Promise.all(searchResultPromises);
-    return searchResults.flat().slice(0, maxResults);
-  } catch (error) {
-    console.debug("Search execution failed:", error);
-    return [];
+  // Use Promise.allSettled for resilience (partial results on failure)
+  const results = await Promise.allSettled(searchPromises);
+
+  // Fan-in: Aggregate successful results
+  const successfulResults = results
+    .filter((r): r is PromiseFulfilledResult<SearchResult[]> => r.status === "fulfilled")
+    .flatMap((r) => r.value);
+
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    console.debug(`${failures.length} engine(s) failed:`, failures.map((f) => (f as PromiseRejectedResult).reason));
   }
+
+  return successfulResults.slice(0, maxResults);
 };
