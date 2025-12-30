@@ -139,27 +139,27 @@ npm run test:docker
 
 ## How to Test
 
-I believe in the importance of testing. This project includes both unit tests and integration tests.
+This project includes a comprehensive test suite. Choose the appropriate command based on your needs.
 
-### Unit & Local Tests
+### Unit Tests
 
-Runs the test suite using Vitest.
+Runs all unit and integration tests locally using Vitest.
 
 ```bash
 npm test
 ```
 
-### Docker Integration Tests
+### Docker Tests (Quick)
 
-Runs the entire test suite inside a Docker container, including proxy simulation.
+A fast way to run the full test suite inside a Docker container. Useful for verifying changes in an isolated environment.
 
 ```bash
 npm run test:docker
 ```
 
-### Infrastructure Tests
+### Infrastructure Validation (Full)
 
-Runs the infrastructure validation tests.
+Runs a comprehensive infrastructure check via Vitest. This builds and validates both the **production** and **test** Docker images, with proper timeout handling and cleanup.
 
 ```bash
 npm run test:infrastructure
@@ -171,16 +171,16 @@ npm run test:infrastructure
 
 In the project directory, you can run:
 
-| Command                       | Description                                                                       |
-| :---------------------------- | :-------------------------------------------------------------------------------- |
-| `npm run build`               | Compiles the TypeScript source code to JavaScript in the `build/` folder.         |
-| `npm run watch`               | Automatically recompiles the code when you verify changes (useful for dev).       |
-| `npm run inspector`           | Launches a web-based UI to interactively test the MCP server tools and resources. |
-| `npm start`                   | Runs the compiled server (must run `npm run build` first).                        |
-| `npm test`                    | Runs the unit tests locally.                                                      |
-| `npm run test:docker`         | Builds and runs the full integration test suite inside a Docker container.        |
-| `npm run test:infrastructure` | Runs the infrastructure validation tests.                                         |
-| `npm run generate-certs`      | Generates self-signed certificates for testing (automatically runs build first).  |
+| Command                       | Description                                                                        |
+| :---------------------------- | :--------------------------------------------------------------------------------- |
+| `npm run build`               | Compiles the TypeScript source code to JavaScript in the `build/` folder.          |
+| `npm run watch`               | Automatically recompiles the code when you verify changes (useful for dev).        |
+| `npm run inspector`           | Launches a web-based UI to interactively test the MCP server tools and resources.  |
+| `npm start`                   | Runs the compiled server (must run `npm run build` first).                         |
+| `npm test`                    | Runs unit and integration tests locally.                                           |
+| `npm run test:docker`         | Runs the test suite in Docker (quick, isolated verification).                      |
+| `npm run test:infrastructure` | Full infrastructure validation (builds and tests both production and test images). |
+| `npm run generate-certs`      | Generates self-signed certificates for testing (automatically runs build first).   |
 
 ---
 
