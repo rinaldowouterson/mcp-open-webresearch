@@ -1,29 +1,32 @@
 import { SearchResult } from "../../types/index.js";
 import { getEngines } from "../../engines/search/registry.js";
+import { mergeSearchResults } from "./signalProcessor.js";
+import { MergedSearchResult } from "../../types/MergedSearchResult.js";
 
 /**
  * Distributes search limit across multiple engines
  */
 export const distributeSearchLimit = (
   totalLimit: number,
-  engineCount: number
+  engineCount: number,
 ): number[] => {
   const base = Math.floor(totalLimit / engineCount);
   const remainder = totalLimit % engineCount;
   return Array.from(
     { length: engineCount },
-    (_, i) => base + (i < remainder ? 1 : 0)
+    (_, i) => base + (i < remainder ? 1 : 0),
   );
 };
 
 /**
- * Executes search across specified engines using dynamic registry
+ * Executes search across specified engines using dynamic registry.
+ * Returns merged results with consensus scoring.
  */
 export const executeMultiEngineSearch = async (
   query: string,
   engines: string[],
-  maxResults: number
-): Promise<SearchResult[]> => {
+  maxResults: number,
+): Promise<MergedSearchResult[]> => {
   const cleanQuery = query.trim();
   if (!cleanQuery) throw new Error("Search query cannot be empty");
 
@@ -45,9 +48,12 @@ export const executeMultiEngineSearch = async (
 
   // Fallback if all requested engines are unavailable
   if (availableEngines.length === 0) {
-    console.debug("All requested engines unavailable, using first available engine");
-    const firstAvailable = Array.from(allEngines.entries())
-      .find(([_, e]) => !e.isRateLimited());
+    console.debug(
+      "All requested engines unavailable, using first available engine",
+    );
+    const firstAvailable = Array.from(allEngines.entries()).find(
+      ([_, e]) => !e.isRateLimited(),
+    );
     if (firstAvailable) {
       availableEngines.push(firstAvailable[0]);
     } else {
@@ -57,7 +63,10 @@ export const executeMultiEngineSearch = async (
   }
 
   // Distribute search limit across engines
-  const engineLimits = distributeSearchLimit(maxResults, availableEngines.length);
+  const engineLimits = distributeSearchLimit(
+    maxResults,
+    availableEngines.length,
+  );
 
   // Fan-out: Execute all searches in parallel
   const searchPromises = availableEngines.map((name, index) => {
@@ -70,13 +79,30 @@ export const executeMultiEngineSearch = async (
 
   // Fan-in: Aggregate successful results
   const successfulResults = results
-    .filter((r): r is PromiseFulfilledResult<SearchResult[]> => r.status === "fulfilled")
+    .filter(
+      (r): r is PromiseFulfilledResult<SearchResult[]> =>
+        r.status === "fulfilled",
+    )
     .flatMap((r) => r.value);
 
   const failures = results.filter((r) => r.status === "rejected");
   if (failures.length > 0) {
-    console.debug(`${failures.length} engine(s) failed:`, failures.map((f) => (f as PromiseRejectedResult).reason));
+    console.debug(
+      `${failures.length} engine(s) failed:`,
+      failures.map((f) => (f as PromiseRejectedResult).reason),
+    );
   }
 
-  return successfulResults.slice(0, maxResults);
+  // Debug: Log all raw results for inspection
+  console.debug(
+    `[Search] Aggregated ${successfulResults.length} raw results before merging:`,
+  );
+  successfulResults.forEach((res, i) => {
+    console.debug(`  ${i + 1}. [${res.engine}] ${res.title} - ${res.url}`);
+  });
+
+  // Merge and rank results by consensus
+  const mergedResults = mergeSearchResults(successfulResults);
+
+  return mergedResults.slice(0, maxResults);
 };
