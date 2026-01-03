@@ -212,7 +212,12 @@ Configuration is managed via Environment Variables or CLI arguments.
 | `HTTP_PROXY`             | -                       | HTTP Proxy URL.                      |
 | `HTTPS_PROXY`            | -                       | HTTPS Proxy URL.                     |
 | `SOCKS5_PROXY`           | -                       | SOCKS5 Proxy URL (Highest Priority). |
-| `SAMPLING`               | `true`                  | Enable result sampling.              |
+| `SAMPLING`               | `false`                 | Enable result sampling.              |
+| `SKIP_IDE_SAMPLING`      | `false`                 | Prefer external API over IDE.        |
+| `LLM_BASE_URL`           | -                       | External LLM API base URL.           |
+| `LLM_API_KEY`            | -                       | External LLM API key.                |
+| `LLM_NAME`               | -                       | External LLM model name.             |
+| `LLM_TIMEOUT_MS`         | `30000`                 | Timeout for external LLM calls.      |
 | `WRITE_DEBUG_TERMINAL`   | `false`                 | Log debug output to stdout.          |
 | `WRITE_DEBUG_FILE`       | `false`                 | Log debug output to file.            |
 
@@ -230,6 +235,50 @@ CLI arguments override environment variables.
 | `--engines <items>` | Comma-separated list of engines. |
 | `--sampling`        | Enable sampling.                 |
 | `--no-sampling`     | Disable sampling.                |
+
+---
+
+## Search Pipeline & Scoring
+
+The server uses a multi-stage pipeline to aggregate and refine search results:
+
+### 1. Multi-Engine Retrieval
+
+Concurrent requests are dispatched to all configured engines (Bing, Brave, DuckDuckGo). Raw results are collected into a single pool.
+
+### 2. Consensus Scoring & Deduplication
+
+Results are grouped by their canonical URL (protocol/www-agnostic hash).
+
+- **Deduplication**: Multiple entries for the same URL are merged.
+- **Scoring**: A `consensusScore` is calculated for each unique URL:
+  - **Inverted Rank Sum**: Individual ranks from engines are inverted ($1/rank$) and summed. This rewards higher placement across engines.
+  - **Engine Boost**: The sum is multiplied by the number of unique engines that found the URL. This rewards multi-provider agreement.
+- **Sorting**: The final list is sorted by the calculated `consensusScore` in descending order.
+
+### 3. LLM Sampling (Optional)
+
+If `SAMPLING=true`, the top-ranked results are sent to an LLM to evaluate semantic relevance to the query.
+
+- **Filtering**: Sampling acts as a binary filter. It removes results identified as irrelevant (spam, off-topic).
+- **Final Set**: The original consensus scores are preserved. Only the composition of the list changes.
+
+---
+
+## LLM Sampling Strategy
+
+When sampling is enabled, the server follows a tiered resolution logic to select which LLM to use:
+
+| SKIP_IDE_SAMPLING | IDE Available | API Configured | Resolution       |
+| ----------------- | ------------- | -------------- | ---------------- |
+| `false` (default) | ✅            | ✅             | **IDE Sampling** |
+| `true`            | ✅            | ❌             | **IDE Sampling** |
+| `false`           | ❌            | ✅             | **External API** |
+| `true`            | ✅ OR ❌      | ✅             | **External API** |
+| `false` OR `true` | ❌            | ❌             | No Sampling      |
+
+> [!TIP]
+> You can use a model without API key, the `LLM_API_KEY` value is optional.
 
 ---
 

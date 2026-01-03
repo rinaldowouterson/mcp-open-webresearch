@@ -2,7 +2,8 @@ import fs from "fs/promises";
 import path from "path";
 import { format } from "util";
 
-const LOG_PATH = process.env.MCP_LOG_PATH || path.resolve(process.cwd(), "mcp-debug.log");
+const LOG_PATH =
+  process.env.MCP_LOG_PATH || path.resolve(process.cwd(), "mcp-debug.log");
 
 interface LoggerConfig {
   writeToTerminal: boolean;
@@ -13,7 +14,6 @@ const loggerConfig: LoggerConfig = {
   writeToTerminal: process.env.WRITE_DEBUG_TERMINAL === "true",
   writeToFile: process.env.WRITE_DEBUG_FILE === "true",
 };
-
 
 export function configureLogger(options: Partial<LoggerConfig>) {
   if (options.writeToTerminal !== undefined) {
@@ -34,7 +34,7 @@ async function initStream(): Promise<void> {
       .catch((error: any) =>
         error.code === "ENOENT"
           ? fs.writeFile(LOG_PATH, "")
-          : Promise.reject(error)
+          : Promise.reject(error),
       );
 
     stream = await fs.open(LOG_PATH, "a");
@@ -116,7 +116,7 @@ export const logger = {
     if (loggerConfig.writeToFile) {
       const formatted = format(message, ...args);
       await writeLogAsync(
-        `[${new Date().toISOString()}] DEBUG: ${formatted}\n`
+        `[${new Date().toISOString()}] DEBUG: ${formatted}\n`,
       );
     }
   },
