@@ -1,17 +1,12 @@
 /**
  * Centralized throttle management for search engines.
- * 
+ *
  * Engines configure their throttle settings at startup.
  * The registry and executeMultiEngineSearch use isThrottled() to skip busy engines.
  * Engines call cooldown() between pages and touch() after each fetch.
  */
 
-export interface ThrottleConfig {
-  /** Milliseconds between separate search queries (e.g., 5000 for Brave) */
-  searchCooldown: number;
-  /** Milliseconds between pages within one search (e.g., 1000) */
-  pageCooldown: number;
-}
+import { ThrottleConfig } from "../../types/ThrottleConfig.js";
 
 // Module state
 const configs = new Map<string, ThrottleConfig>();
@@ -34,7 +29,7 @@ export function setThrottle(engine: string, config: ThrottleConfig): void {
 export function isThrottled(engine: string): boolean {
   const config = configs.get(engine) ?? defaultConfig;
   if (config.searchCooldown === 0) return false;
-  
+
   const last = lastUsed.get(engine) ?? 0;
   return Date.now() - last < config.searchCooldown;
 }

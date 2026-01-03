@@ -2,7 +2,7 @@
  * Attribution:
  * This module includes code adapted from mzxrai/mcp-webresearch (MIT License).
  * Original Author: mzxrai
- * 
+ *
  * Modifications by rinaldowouterson:
  * - Added comprehensive SOCKS5/HTTP proxy support
  * - Removed Google-specific consent handling
@@ -17,9 +17,10 @@ import * as os from "os";
 import { isValidBrowserUrl } from "../../utils/isValidUrl.js";
 import { loadConfig } from "../../config/index.js";
 import { startProxyBridge, stopProxyBridge } from "../../utils/proxy_bridge.js";
+import { VisitResult } from "../../types/VisitResult.js";
 
 const SCREENSHOTS_DIR = fs.mkdtempSync(
-  path.join(os.tmpdir(), "mcp-screenshots-")
+  path.join(os.tmpdir(), "mcp-screenshots-"),
 );
 
 let cleanupTimer: NodeJS.Timeout | null = null;
@@ -57,13 +58,6 @@ turndownService.addRule("preserveImages", {
   },
 });
 
-export interface VisitResult {
-  url: string;
-  title: string;
-  content: string;
-  screenshot?: string;
-}
-
 let browser: Browser | undefined;
 
 async function ensureBrowser(): Promise<Page> {
@@ -82,7 +76,7 @@ async function ensureBrowser(): Promise<Page> {
         const auth =
           username || password
             ? `${encodeURIComponent(username || "")}:${encodeURIComponent(
-                password || ""
+                password || "",
               )}@`
             : "";
         const upstreamUrl = `${protocol}://${auth}${host}:${port}`;
@@ -93,7 +87,10 @@ async function ensureBrowser(): Promise<Page> {
           };
           console.debug(`SOCKS5 Bridge activated`);
         } catch (error) {
-          console.error("Failed to start bridge, falling back to direct:", error);
+          console.error(
+            "Failed to start bridge, falling back to direct:",
+            error,
+          );
         }
       }
     }
@@ -186,7 +183,7 @@ async function takeScreenshotWithSizeLimit(page: Page): Promise<string> {
     if (buffer.length > MAX_SIZE) {
       throw new McpError(
         ErrorCode.InvalidRequest,
-        `Screenshot exceeds 5MB limit after optimization`
+        `Screenshot exceeds 5MB limit after optimization`,
       );
     }
   }
@@ -196,7 +193,7 @@ async function takeScreenshotWithSizeLimit(page: Page): Promise<string> {
 
 async function saveScreenshot(
   screenshot: string,
-  title: string
+  title: string,
 ): Promise<string> {
   const buffer = Buffer.from(screenshot, "base64");
   const MAX_SIZE = 5 * 1024 * 1024;
@@ -204,7 +201,7 @@ async function saveScreenshot(
   if (buffer.length > MAX_SIZE) {
     throw new McpError(
       ErrorCode.InvalidRequest,
-      `Screenshot too large: ${Math.round(buffer.length / (1024 * 1024))}MB`
+      `Screenshot too large: ${Math.round(buffer.length / (1024 * 1024))}MB`,
     );
   }
 
@@ -260,7 +257,7 @@ async function safePageNavigation(page: Page, url: string): Promise<void> {
 
 async function extractContentAsMarkdown(
   page: Page,
-  selector?: string
+  selector?: string,
 ): Promise<string> {
   const html = await page.evaluate((sel: string | undefined) => {
     if (sel) {
@@ -326,12 +323,12 @@ async function extractContentAsMarkdown(
 
 export async function visitPage(
   url: string,
-  takeScreenshot = false
+  takeScreenshot = false,
 ): Promise<VisitResult> {
   if (!isValidBrowserUrl(url)) {
     throw new McpError(
       ErrorCode.InvalidRequest,
-      `Invalid URL: Only http/https protocols supported`
+      `Invalid URL: Only http/https protocols supported`,
     );
   }
 
@@ -357,7 +354,7 @@ export async function visitPage(
   } catch (error) {
     throw new McpError(
       ErrorCode.InternalError,
-      `Page visit failed: ${(error as Error).message}`
+      `Page visit failed: ${(error as Error).message}`,
     );
   } finally {
     await page.close();
@@ -395,7 +392,7 @@ async function deleteScreenshots(deleteFolder = false): Promise<boolean> {
 
   if (files.length > 0) {
     await Promise.all(
-      files.map((file) => fs.promises.unlink(path.join(SCREENSHOTS_DIR, file)))
+      files.map((file) => fs.promises.unlink(path.join(SCREENSHOTS_DIR, file))),
     );
     console.debug(`Cleaned up ${files.length} screenshot(s)`);
   } else {
