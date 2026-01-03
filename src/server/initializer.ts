@@ -33,18 +33,18 @@ export const serverInitializer = (mcpServer: McpServer): void => {
           .min(1)
           .refine(
             (arr) => arr.every((e) => availableEngines.includes(e)),
-            `Invalid engine. Available: ${availableEngines.join(", ")}`
+            `Invalid engine. Available: ${availableEngines.join(", ")}`,
           )
           .describe(
             `List of search engines to set as default. Available: ${availableEngines.join(
-              ", "
-            )}`
+              ", ",
+            )}`,
           ),
       },
     },
     async ({ engines }) => {
       return await updateDefaultSearchEngines(engines);
-    }
+    },
   );
 
   // Tool: Get current engines
@@ -59,10 +59,10 @@ export const serverInitializer = (mcpServer: McpServer): void => {
         JSON.stringify(
           { defaultEngines: loadConfig().defaultSearchEngines },
           null,
-          2
-        )
+          2,
+        ),
       );
-    }
+    },
   );
 
   // Tool: Set sampling
@@ -70,7 +70,7 @@ export const serverInitializer = (mcpServer: McpServer): void => {
     "set_sampling",
     {
       description:
-        "Enable or disable sampling for search results. When enabled, uses the client's LLM to filter out irrelevant/low-quality results before returning them. Persists setting to .env",
+        "Enable or disable LLM-based relevance filtering for search results. When enabled, an LLM evaluates each result for relevance to the query. Requires either: (1) IDE/client with sampling support, OR (2) LLM_BASE_URL set (LLM_API_KEY optional for local models). Persists setting to .env",
       inputSchema: {
         enabled: z
           .boolean()
@@ -79,7 +79,7 @@ export const serverInitializer = (mcpServer: McpServer): void => {
     },
     async ({ enabled }) => {
       return await updateSampling(enabled);
-    }
+    },
   );
 
   // Tool: Get sampling status
@@ -87,12 +87,12 @@ export const serverInitializer = (mcpServer: McpServer): void => {
     "get_sampling",
     {
       description:
-        "Check whether sampling is currently enabled. When sampling is enabled, search results are filtered using the client's LLM to remove irrelevant content.",
+        "Check whether LLM sampling is currently enabled. When enabled, results are filtered by relevance using an LLM. Disabled by default.",
       inputSchema: {},
     },
     async () => {
       return getSamplingResponse();
-    }
+    },
   );
 
   // Tool: Web search
@@ -112,20 +112,20 @@ export const serverInitializer = (mcpServer: McpServer): void => {
           .max(50)
           .default(10)
           .describe(
-            "Maximum number of results to return. Current default is 10. Maximum is 50. It's distributed across engines."
+            "Maximum number of results to return. Current default is 10. Maximum is 50. It's distributed across engines.",
           ),
         engines: z
           .array(z.string())
           .min(1)
           .optional()
           .describe(
-            `Engines to use. Available: ${availableEngines.join(", ")}`
+            `Engines to use. Available: ${availableEngines.join(", ")}`,
           ),
         sampling: z
           .boolean()
           .optional()
           .describe(
-            "Override global sampling setting. When true, filters results using the client's LLM. Defaults to global setting."
+            "Override global sampling setting. When true, filters results using the client's LLM. Defaults to global setting.",
           ),
       },
     },
@@ -140,28 +140,36 @@ export const serverInitializer = (mcpServer: McpServer): void => {
         let results = await executeMultiEngineSearch(
           query,
           enginesToUse,
-          max_results
+          max_results,
         );
 
         // Determine if sampling should be applied
         // Parameter overrides global setting if provided
         const shouldSample = sampling !== undefined ? sampling : getSampling();
-        console.debug(`Search: Global sampling=${getSampling()}, Request override=${sampling}, Effective=${shouldSample}`);
+        console.debug(
+          `Search: Global sampling=${getSampling()}, Request override=${sampling}, Effective=${shouldSample}`,
+        );
 
         // Apply sampling filter if enabled
         if (shouldSample && results.length > 0) {
-          console.debug(`Search: invoking sampling filter on ${results.length} results...`);
+          console.debug(
+            `Search: invoking sampling filter on ${results.length} results...`,
+          );
           results = await filterResultsWithSampling({
             query: query.trim(),
             results,
             maxResults: max_results,
             server: mcpServer,
           });
-          console.debug(`Search: sampling complete. Returning ${results.length} results.`);
+          console.debug(
+            `Search: sampling complete. Returning ${results.length} results.`,
+          );
         } else if (shouldSample && results.length === 0) {
-          console.debug("Search: verification enabled but no results to sample.");
+          console.debug(
+            "Search: verification enabled but no results to sample.",
+          );
         } else {
-             console.debug("Search: sampling disabled, returning raw results.");
+          console.debug("Search: sampling disabled, returning raw results.");
         }
 
         return createResponse(
@@ -174,15 +182,15 @@ export const serverInitializer = (mcpServer: McpServer): void => {
               results,
             },
             null,
-            2
-          )
+            2,
+          ),
         );
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
         return createResponse(`Search failed: ${errorMessage}`, true);
       }
-    }
+    },
   );
 
   // Tool: Visit webpage
@@ -211,14 +219,14 @@ export const serverInitializer = (mcpServer: McpServer): void => {
               screenshot: result.screenshot,
             },
             null,
-            2
-          )
+            2,
+          ),
         );
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
         return createResponse(`Page visit failed: ${errorMessage}`, true);
       }
-    }
+    },
   );
 };

@@ -1,23 +1,19 @@
-import { SearchResult } from "../../types/index.js";
+import { MergedSearchResult } from "../../types/MergedSearchResult.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-
-export interface SamplingFilterOptions {
-  query: string;
-  results: SearchResult[];
-  maxResults: number;
-  server: McpServer;
-}
+import { loadConfig } from "../../config/index.js";
+import { buildSamplingPrompt } from "../../prompts/index.js";
+import { SamplingFilterOptions } from "../../types/SamplingFilterOptions.js";
 
 /**
  * Formats search results as a numbered list for LLM evaluation
  */
-const formatResultsForEvaluation = (results: SearchResult[]): string => {
+const formatResultsForEvaluation = (results: MergedSearchResult[]): string => {
   return results
     .map(
       (result, index) =>
-        `${index + 1}. [${result.title}] (${result.source}) - ${
+        `${index + 1}. [${result.title}] (${result.engines.join(", ")}) - ${
           result.description
-        }`
+        }`,
     )
     .join("\n");
 };
@@ -39,8 +35,7 @@ const parseApprovedIndices = (response: string): number[] => {
 
   let remainingText = response.slice(firstMatch.index! + firstMatch[0].length);
 
-  // Iteratively look for next numbers separated by valid delimiters (comma, and, &, or spaces)
-  // Stops as soon as the delimiter pattern is broken or followed by non-digits
+  // Iteratively look for next numbers separated by valid delimiters
   const nextPattern = /^[\s,]*\s*(?:and|&)?\s*(\d+)/i;
 
   while (remainingText) {
@@ -59,30 +54,37 @@ const parseApprovedIndices = (response: string): number[] => {
 };
 
 /**
- * Internal helper: Call OpenRouter/OpenAI Compatible API directly
- * Bypasses the MCP Client Sampling Protocol
+ * Calls an OpenAI-compatible API directly.
+ * Uses config.llm for all settings (baseUrl, apiKey, model, timeout).
  */
 const fetchDirectInference = async (prompt: string): Promise<string> => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const baseUrl = process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1";
-  const model = process.env.OPENAI_MODEL || "google/gemini-2.0-flash-001"; // Fallback model
+  const config = loadConfig();
+  const { baseUrl, apiKey, model, timeoutMs } = config.llm;
 
-  if (!apiKey) throw new Error("No API Key available for direct inference");
+  if (!baseUrl || !model) {
+    throw new Error("LLM not configured: baseUrl and model are required");
+  }
 
-  console.debug(`[Sampling] Bypassing client. Using direct API: ${model}`);
+  console.debug(`[Sampling] Using direct API: ${model} at ${baseUrl}`);
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    // Only add Authorization header if API key is provided
+    if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify({
-        model: model,
+        model,
         messages: [
           {
             role: "system",
@@ -90,7 +92,7 @@ const fetchDirectInference = async (prompt: string): Promise<string> => {
           },
           { role: "user", content: prompt },
         ],
-        temperature: 0, // Deterministic for filtering
+        temperature: 0,
       }),
       signal: controller.signal,
     });
@@ -98,19 +100,20 @@ const fetchDirectInference = async (prompt: string): Promise<string> => {
     const responseTextRaw = await response.text();
 
     if (!response.ok) {
-      throw new Error(`Inference API Error (${response.status}): ${responseTextRaw}`);
+      throw new Error(
+        `Inference API Error (${response.status}): ${responseTextRaw}`,
+      );
     }
 
     const data = JSON.parse(responseTextRaw);
-    const content = data.choices?.[0]?.message?.content || "";
-    return content;
+    return data.choices?.[0]?.message?.content || "";
   } finally {
     clearTimeout(timeoutId);
   }
 };
 
 /**
- * Check if the client supports sampling capability
+ * Check if the client supports MCP sampling capability
  */
 export const clientSupportsSampling = (server: McpServer): boolean => {
   const capabilities = server.server.getClientCapabilities();
@@ -118,66 +121,94 @@ export const clientSupportsSampling = (server: McpServer): boolean => {
 };
 
 /**
- * Filters search results using a Hybrid Strategy:
- * 1. Checks for OPENAI_API_KEY to bypass client limitations (AntiGravity Fix).
- * 2. Falls back to MCP Protocol Sampling if no key is present.
- * 3. Returns unfiltered results if both fail.
+ * Filters search results using LLM-based relevance evaluation.
+ *
+ * Strategy priority:
+ * 1. If skipIdeSampling=true AND external LLM is available: use direct API only
+ * 2. If skipIdeSampling=false: try IDE sampling first, fallback to direct API
+ * 3. Fallback to unfiltered results if neither works
  */
 export const filterResultsWithSampling = async (
-  options: SamplingFilterOptions
-): Promise<SearchResult[]> => {
+  options: SamplingFilterOptions,
+): Promise<MergedSearchResult[]> => {
   const { query, results, maxResults, server } = options;
-
   if (results.length === 0) return [];
 
-  // Prepare the prompt once
+  const config = loadConfig();
+  // Build the prompt
   const formattedResults = formatResultsForEvaluation(results);
-  const prompt = `You are evaluating search results for relevance and quality.
-
-Query: "${query}"
-
-Evaluate these search results and return ONLY the indices of relevant, high-quality results as comma-separated numbers:
-
-${formattedResults}
-
-Rules:
-- Return ONLY comma-separated numbers (e.g., "1,3,5,7")
-- Exclude: spam, unrelated content, low-quality pages
-- If no results are relevant, respond with "none"
-
-Your response (comma-separated indices only):`;
+  const prompt = buildSamplingPrompt(query, formattedResults);
 
   let responseText = "";
+  const skipIdeSampling = config.llm.skipIdeSampling;
+  const ideAvailable = clientSupportsSampling(server);
+  const apiAvailable = config.llm.isAvailable;
 
   try {
-    // --- STRATEGY A: DIRECT API (BYPASS) ---
-    if (process.env.OPENAI_API_KEY) {
+    // Determine strategy based on skipIdeSampling preference
+    if (skipIdeSampling && apiAvailable) {
+      // User explicitly wants to skip IDE sampling
+      console.debug("[Sampling] SKIP_IDE_SAMPLING=true, using direct API...");
       try {
         responseText = await fetchDirectInference(prompt);
       } catch (directError: any) {
-        console.debug(`[Sampling] Direct API attempt skipped or failed: ${directError.message}`);
-        // Do not return here; allow fall-through to Strategy B
+        console.debug(`[Sampling] Direct API failed: ${directError.message}`);
+        // Graceful degradation to IDE if available
+        if (ideAvailable) {
+          console.debug("[Sampling] Falling back to IDE sampling...");
+          const response = await server.server.createMessage({
+            messages: [
+              { role: "user", content: { type: "text", text: prompt } },
+            ],
+            maxTokens: 100,
+          });
+          responseText =
+            response.content.type === "text" ? response.content.text : "";
+        } else {
+          console.debug("[Sampling] No fallback available. Using raw results.");
+          return results.slice(0, maxResults);
+        }
       }
-    }
-
-    // --- STRATEGY B: MCP CLIENT PROTOCOL ---
-    if (!responseText) {
-      if (!clientSupportsSampling(server)) {
-        console.debug("[Sampling] Strategy: No local API key and client lacks sampling support. Using raw results.");
-        return results.slice(0, maxResults); // Fail-safe
-      }
-
-      console.debug("[Sampling] Strategy: Using MCP Protocol sampling...");
+    } else if (!skipIdeSampling && ideAvailable) {
+      // Prefer IDE sampling (default behavior)
+      console.debug("[Sampling] Using MCP Protocol sampling...");
       const response = await server.server.createMessage({
         messages: [{ role: "user", content: { type: "text", text: prompt } }],
         maxTokens: 100,
       });
-
       responseText =
         response.content.type === "text" ? response.content.text : "";
+    } else if (apiAvailable) {
+      // IDE not available but API is
+      console.debug("[Sampling] IDE not available, using direct API...");
+      try {
+        responseText = await fetchDirectInference(prompt);
+      } catch (directError: any) {
+        console.debug(`[Sampling] Direct API failed: ${directError.message}`);
+      }
     }
 
-    // --- PROCESSING RESPONSE ---
+    // Final fallback check
+    if (!responseText) {
+      if (!ideAvailable && !apiAvailable) {
+        console.debug(
+          "[Sampling] No LLM available and client lacks sampling. Using raw results.",
+        );
+        return results.slice(0, maxResults);
+      }
+      // Try IDE as last resort if not yet tried
+      if (ideAvailable && !skipIdeSampling) {
+        console.debug("[Sampling] Using MCP Protocol sampling...");
+        const response = await server.server.createMessage({
+          messages: [{ role: "user", content: { type: "text", text: prompt } }],
+          maxTokens: 100,
+        });
+        responseText =
+          response.content.type === "text" ? response.content.text : "";
+      }
+    }
+
+    // --- PROCESS RESPONSE ---
     console.debug(`[Sampling] Decision received: ${responseText}`);
 
     if (responseText.toLowerCase().includes("none")) {
@@ -187,7 +218,9 @@ Your response (comma-separated indices only):`;
     const approvedIndices = parseApprovedIndices(responseText);
 
     if (approvedIndices.length === 0) {
-      console.debug("[Sampling] Warning: No valid indices parsed. Returning unfiltered.");
+      console.debug(
+        "[Sampling] No valid indices parsed. Returning unfiltered.",
+      );
       return results.slice(0, maxResults);
     }
 
@@ -196,9 +229,8 @@ Your response (comma-separated indices only):`;
       .map((index) => results[index])
       .slice(0, maxResults);
 
-    console.debug(`[Sampling] Filtered down to ${filteredResults.length} results.`);
+    console.debug(`[Sampling] Filtered to ${filteredResults.length} results.`);
     return filteredResults;
-
   } catch (error) {
     console.debug("[Sampling] Fatal error during filtering:", error);
     return results.slice(0, maxResults);
