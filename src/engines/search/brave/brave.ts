@@ -21,10 +21,10 @@ function parseResults($: cheerio.Root): SearchResult[] {
 
       const titleElement = resultElement.find(".title");
       const title = titleElement.text().trim();
-      
+
       // The URL is usually on the anchor tag that wraps the title, or a sibling
       let url = titleElement.closest("a").attr("href");
-      
+
       // Fallback: look for the first anchor if title is not inside one
       if (!url) {
         url = resultElement.find("a").first().attr("href");
@@ -47,16 +47,18 @@ function parseResults($: cheerio.Root): SearchResult[] {
           .trim();
       }
 
-      const source = resultElement.find(".sitename").text().trim() || 
-                     resultElement.find(".site-name-content").text().trim();
+      const source =
+        resultElement.find(".sitename").text().trim() ||
+        resultElement.find(".site-name-content").text().trim();
 
-      return {
+      const searchResult: SearchResult = {
         title,
         url,
         description,
-        source,
         engine: "brave",
       };
+
+      return searchResult;
     })
     .get()
     .filter(Boolean) as SearchResult[];
@@ -70,14 +72,14 @@ function parseResults($: cheerio.Root): SearchResult[] {
  */
 export async function searchBrave(
   query: string,
-  limit: number
+  limit: number,
 ): Promise<SearchResult[]> {
   const results: SearchResult[] = [];
 
   for (let page = 0; page < MAX_PAGES && results.length < limit; page++) {
     try {
       const offset = page * RESULTS_PER_PAGE;
-      
+
       // Wait for page cooldown between pagination requests
       if (page > 0) {
         await cooldown("brave");
@@ -89,15 +91,7 @@ export async function searchBrave(
       const pageResults = parseResults($);
 
       if (pageResults.length === 0 && results.length === 0) {
-        return [
-          {
-            title: "No results found",
-            url: "",
-            description: "Your search didn't return any results",
-            source: "brave",
-            engine: "brave",
-          },
-        ];
+        return [];
       }
 
       results.push(...pageResults);

@@ -20,7 +20,6 @@ const rawJsonToSearchResultType = (item: any): SearchResult => ({
   title: item.t || "",
   url: item.u || "",
   description: item.a || "",
-  source: item.i || item.sn || "",
   engine: "duckduckgo",
 });
 
@@ -44,7 +43,7 @@ const extractDuckDuckApiUrlFromHTML = (html: string): string | null => {
 
 const searchDuckDuckGo = async (
   query: string,
-  limit: number
+  limit: number,
 ): Promise<SearchResult[]> => {
   const allSearchResults: SearchResult[] = [];
   let offset = 0;
@@ -62,9 +61,15 @@ const searchDuckDuckGo = async (
 
     if (!rawJsonFromApi?.length) break;
 
-    const validatedResults = rawJsonFromApi
+    const validatedResults: SearchResult[] = rawJsonFromApi
       .filter((rawJSON) => !rawJSON.n)
       .map(rawJsonToSearchResultType)
+      .filter(
+        (result) =>
+          result.url.length > 0 &&
+          result.description.length > 0 &&
+          result.title.length > 0,
+      )
       .slice(0, limit - allSearchResults.length);
 
     if (validatedResults.length === 0) break;

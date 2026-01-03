@@ -2,14 +2,16 @@ export interface SearchResult {
   title: string;
   url: string;
   description: string;
-  source: string;
   engine: string;
 }
 
 /**
  * Function signature for search operations.
  */
-export type SearchFn = (query: string, limit: number) => Promise<SearchResult[]>;
+export type SearchFn = (
+  query: string,
+  limit: number,
+) => Promise<SearchResult[]>;
 
 /**
  * Contract that each search engine must satisfy.
