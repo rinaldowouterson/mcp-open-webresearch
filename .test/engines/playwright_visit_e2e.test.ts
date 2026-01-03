@@ -101,6 +101,11 @@ function createTestServer(): Promise<{ server: http.Server; url: string }> {
           res.end();
           break;
 
+        case "/connection-reset":
+          // Simulate a failed connection by destroying the socket
+          res.socket?.destroy();
+          break;
+
         default:
           res.writeHead(404, { "Content-Type": "text/plain" });
           res.end("Not Found");
@@ -245,29 +250,28 @@ describe("visitPage", { timeout: 30000 }, () => {
     await expect(visitPage("ftp://example.com")).rejects.toThrow(
       new McpError(
         ErrorCode.InvalidRequest,
-        "Invalid URL: Only http/https protocols supported"
-      )
+        "Invalid URL: Only http/https protocols supported",
+      ),
     );
 
     await expect(visitPage("mailto:test@example.com")).rejects.toThrow(
       new McpError(
         ErrorCode.InvalidRequest,
-        "Invalid URL: Only http/https protocols supported"
-      )
+        "Invalid URL: Only http/https protocols supported",
+      ),
     );
   });
 
-  test("handles DNS resolution failures", async () => {
-    await expect(
-      visitPage("https://this-domain-definitely-does-not-exist-12345.invalid")
-    ).rejects.toThrow(
+  test("handles connection failures gracefully", async () => {
+    // Use the local /connection-reset endpoint that destroys the socket
+    // This simulates network errors without external DNS lookups
+    await expect(visitPage(`${serverUrl}/connection-reset`)).rejects.toThrow(
       expect.objectContaining({
         code: ErrorCode.InternalError,
-        // When running in Docker with a proxy, DNS failures on the proxy side 
-        // usually result in a 502/504 error page or a generic net:: error from the proxy.
-        // We accept both native resolution failure and proxy failure messages.
-        message: expect.stringMatching(/net::ERR_NAME_NOT_RESOLVED|net::ERR_TUNNEL_CONNECTION_FAILED|502|504|Navigation failed/),
-      })
+        message: expect.stringMatching(
+          /Navigation failed|net::ERR_CONNECTION_REFUSED|net::ERR_CONNECTION_RESET|net::ERR_EMPTY_RESPONSE/,
+        ),
+      }),
     );
   });
 
@@ -276,7 +280,7 @@ describe("visitPage", { timeout: 30000 }, () => {
       expect.objectContaining({
         code: ErrorCode.InternalError,
         message: expect.stringContaining("Bot protection detected"),
-      })
+      }),
     );
   });
 
@@ -285,7 +289,7 @@ describe("visitPage", { timeout: 30000 }, () => {
       expect.objectContaining({
         code: ErrorCode.InternalError,
         message: expect.stringContaining("Suspicious title"),
-      })
+      }),
     );
   });
 
@@ -294,9 +298,9 @@ describe("visitPage", { timeout: 30000 }, () => {
       expect.objectContaining({
         code: ErrorCode.InternalError,
         message: expect.stringContaining(
-          "Navigation failed: Insufficient content"
+          "Navigation failed: Insufficient content",
         ),
-      })
+      }),
     );
   });
 
