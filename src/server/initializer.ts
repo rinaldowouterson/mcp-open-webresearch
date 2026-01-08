@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { visitPage } from "../engines/visit_page/visit.js";
 import { z } from "zod";
-import { loadConfig } from "../config/index.js";
+import { getConfig } from "../config/index.js";
 import { getEngineNames } from "../engines/search/registry.js";
 import { executeMultiEngineSearch } from "./helpers/executeMultiEngineSearch.js";
 import { updateDefaultSearchEngines } from "./helpers/updateDefaultSearchEngines.js";
@@ -57,7 +57,7 @@ export const serverInitializer = (mcpServer: McpServer): void => {
     async () => {
       return createResponse(
         JSON.stringify(
-          { defaultEngines: loadConfig().defaultSearchEngines },
+          { defaultEngines: getConfig().defaultSearchEngines },
           null,
           2,
         ),
@@ -134,7 +134,7 @@ export const serverInitializer = (mcpServer: McpServer): void => {
         // Use provided engines or fall back to configured defaults
         const enginesToUse = engines?.length
           ? engines
-          : loadConfig().defaultSearchEngines;
+          : getConfig().defaultSearchEngines;
 
         // Execute the search
         let results = await executeMultiEngineSearch(

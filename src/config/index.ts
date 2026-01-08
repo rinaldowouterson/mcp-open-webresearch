@@ -11,10 +11,10 @@ import {
 import { ConfigOverrides } from "../types/index.js";
 
 /**
- * Module-level singleton for LLM configuration.
- * Initialized once via setLLMConfig(server) during startup.
+ * Module-level singleton for application configuration.
+ * Initialized once via setConfig(server, overrides) during startup.
  */
-let llmConfig: LlmConfig | null = null;
+let appConfig: Readonly<AppConfig> | null = null;
 
 const supportedProtocolPatterns = /^(https?|socks5):\/\//i;
 
@@ -109,7 +109,7 @@ const loadProxyConfig = (overrides?: ConfigOverrides): ProxyConfig => {
 
 /**
  * Check if the MCP client supports LLM sampling capability.
- * Called once during setLLMConfig to determine IDE availability.
+ * Called once during setConfig to determine IDE availability.
  */
 const clientSupportsSampling = (server: McpServer): boolean => {
   const capabilities = server.server.getClientCapabilities();
@@ -117,11 +117,9 @@ const clientSupportsSampling = (server: McpServer): boolean => {
 };
 
 /**
- * Initializes LLM configuration. Must be called once during server startup.
- * Reads environment variables, checks server capabilities, and computes
- * samplingAllowed based on README.md priority table.
+ * Builds LLM configuration from environment variables and server capabilities.
  */
-export const setLLMConfig = (server: McpServer): void => {
+const buildLlmConfig = (server: McpServer): LlmConfig => {
   const baseUrl = process.env.LLM_BASE_URL || null;
   const apiKey = process.env.LLM_API_KEY || null;
   const model = process.env.LLM_NAME || null;
@@ -149,7 +147,7 @@ export const setLLMConfig = (server: McpServer): void => {
     );
   }
 
-  llmConfig = {
+  return {
     samplingAllowed,
     baseUrl,
     apiKey,
@@ -162,24 +160,65 @@ export const setLLMConfig = (server: McpServer): void => {
 };
 
 /**
- * Returns the cached LLM configuration.
- * Throws an error if setLLMConfig() has not been called during startup.
+ * Initializes application configuration. Must be called once during server startup.
+ * Reads environment variables, applies overrides, and stores the frozen config singleton.
+ * @returns The frozen application configuration.
  */
-const loadLlmConfig = (): LlmConfig => {
-  if (!llmConfig) {
-    throw new Error(
-      "LLM config not initialized. Call setLLMConfig(server) first during startup.",
-    );
+export const setConfig = (
+  server: McpServer,
+  overrides?: ConfigOverrides,
+): Readonly<AppConfig> => {
+  if (appConfig) {
+    console.debug("setConfig called multiple times. Using existing config.");
+    return appConfig;
   }
-  return llmConfig;
+
+  const defaultSearchEngines =
+    overrides?.engines ||
+    (process.env.DEFAULT_SEARCH_ENGINES
+      ? process.env.DEFAULT_SEARCH_ENGINES.split(",").map((e) => e.trim())
+      : ["bing", "duckduckgo", "brave"]);
+
+  const enableCors = overrides?.cors ?? process.env.ENABLE_CORS === "true";
+
+  const config: AppConfig = {
+    defaultSearchEngines,
+    proxy: loadProxyConfig(overrides),
+    enableCors,
+    corsOrigin: process.env.CORS_ORIGIN || "*",
+    ssl: {
+      ignoreTlsErrors: process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0",
+    },
+    llm: buildLlmConfig(server),
+  };
+
+  appConfig = Object.freeze(config);
+  return appConfig;
 };
 
 /**
- * TEST ONLY: Resets the LLM config singleton for unit testing.
+ * Returns the cached application configuration.
+ * Throws an error if setConfig() has not been called during startup.
+ */
+export const getConfig = (): Readonly<AppConfig> => {
+  if (!appConfig) {
+    throw new Error(
+      "Config not initialized. Call setConfig(server, overrides) first during startup.",
+    );
+  }
+  return appConfig;
+};
+
+/**
+ * TEST ONLY: Resets the config singleton for unit testing.
  * Allows tests to initialize config based on env vars without a real server.
  * @param ideSupportsSampling - Mocked IDE sampling capability (default: false)
+ * @param overrides - Optional ConfigOverrides to apply
  */
-export const resetLLMConfigForTesting = (ideSupportsSampling = false): void => {
+export const resetConfigForTesting = (
+  ideSupportsSampling = false,
+  overrides?: ConfigOverrides,
+): void => {
   const baseUrl = process.env.LLM_BASE_URL || null;
   const apiKey = process.env.LLM_API_KEY || null;
   const model = process.env.LLM_NAME || null;
@@ -204,22 +243,6 @@ export const resetLLMConfigForTesting = (ideSupportsSampling = false): void => {
     );
   }
 
-  llmConfig = {
-    samplingAllowed,
-    baseUrl,
-    apiKey,
-    model,
-    timeoutMs,
-    skipIdeSampling,
-    apiSamplingAvailable,
-    ideSupportsSampling,
-  };
-};
-
-export const loadConfig = (
-  overrides?: ConfigOverrides,
-): Readonly<AppConfig> => {
-  // Engine validation happens at runtime via registry - just parse the config here
   const defaultSearchEngines =
     overrides?.engines ||
     (process.env.DEFAULT_SEARCH_ENGINES
@@ -228,7 +251,7 @@ export const loadConfig = (
 
   const enableCors = overrides?.cors ?? process.env.ENABLE_CORS === "true";
 
-  const config: AppConfig = {
+  appConfig = Object.freeze({
     defaultSearchEngines,
     proxy: loadProxyConfig(overrides),
     enableCors,
@@ -236,8 +259,15 @@ export const loadConfig = (
     ssl: {
       ignoreTlsErrors: process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0",
     },
-    llm: loadLlmConfig(),
-  };
-
-  return Object.freeze(config);
+    llm: {
+      samplingAllowed,
+      baseUrl,
+      apiKey,
+      model,
+      timeoutMs,
+      skipIdeSampling,
+      apiSamplingAvailable,
+      ideSupportsSampling,
+    },
+  });
 };

@@ -1,19 +1,19 @@
 import { createResponse } from "./createResponse.js";
-import { loadConfig } from "../../config/index.js";
+import { getConfig } from "../../config/index.js";
 
 /**
  * Gets the current sampling setting from config.
  * Defaults to false if not set (sampling requires LLM configuration).
  */
 export const getSampling = (): boolean => {
-  return loadConfig().llm.samplingAllowed;
+  return getConfig().llm.samplingAllowed;
 };
 
 /**
  * Returns a formatted response with the current sampling status
  */
 export const getSamplingResponse = () => {
-  const config = loadConfig();
+  const config = getConfig();
   return createResponse(
     JSON.stringify(
       {

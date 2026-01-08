@@ -1,6 +1,6 @@
 import { MergedSearchResult } from "../../types/MergedSearchResult.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { loadConfig } from "../../config/index.js";
+import { getConfig } from "../../config/index.js";
 import { buildSamplingPrompt } from "../../prompts/index.js";
 import { SamplingFilterOptions } from "../../types/SamplingFilterOptions.js";
 
@@ -58,7 +58,7 @@ const parseApprovedIndices = (response: string): number[] => {
  * Uses config.llm for all settings (baseUrl, apiKey, model, timeout).
  */
 const fetchDirectInference = async (prompt: string): Promise<string> => {
-  const config = loadConfig();
+  const config = getConfig();
   const { baseUrl, apiKey, model, timeoutMs } = config.llm;
 
   if (!baseUrl || !model) {
@@ -126,7 +126,7 @@ export const filterResultsWithSampling = async (
   const { query, results, maxResults, server } = options;
   if (results.length === 0) return [];
 
-  const config = loadConfig();
+  const config = getConfig();
 
   // Early exit if sampling is not allowed
   if (!config.llm.samplingAllowed) {

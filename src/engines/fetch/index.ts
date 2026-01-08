@@ -1,8 +1,8 @@
-import { loadConfig } from "../../config/index.js";
+import { getConfig } from "../../config/index.js";
 import { smartFetch } from "./client.js";
 
 function fetchLogs() {
-  const config = loadConfig();
+  const config = getConfig();
   console.debug(`fetch: Config enabled? ${config.proxy.enabled}`);
   console.debug(`fetch: Proxy URL:`, config.proxy.url);
 }

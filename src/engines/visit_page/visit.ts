@@ -15,7 +15,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { isValidBrowserUrl } from "../../utils/isValidUrl.js";
-import { loadConfig } from "../../config/index.js";
+import { getConfig } from "../../config/index.js";
 import { startProxyBridge, stopProxyBridge } from "../../utils/proxy_bridge.js";
 import { VisitResult } from "../../types/VisitResult.js";
 
@@ -64,7 +64,7 @@ async function ensureBrowser(): Promise<Page> {
   if (!browser) {
     const launchOptions: LaunchOptions = createLaunchOptionsForPlayWright();
 
-    const config = loadConfig();
+    const config = getConfig();
     if (
       config.proxy.enabled &&
       config.proxy.isValid &&
@@ -110,7 +110,7 @@ async function ensureBrowser(): Promise<Page> {
 }
 
 export function createLaunchOptionsForPlayWright() {
-  const config = loadConfig();
+  const config = getConfig();
   const launchOptions: LaunchOptions = process.env.DOCKER_ENVIRONMENT
     ? {
         headless: true,

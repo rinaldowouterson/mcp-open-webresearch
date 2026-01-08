@@ -10,7 +10,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
 import cors from "cors";
 import { program } from "commander";
-import { loadConfig, setLLMConfig } from "./config/index.js";
+import { setConfig } from "./config/index.js";
 import { type ConfigOverrides } from "./types/ConfigOverrides.js";
 import { cleanBrowserSession } from "./engines/visit_page/visit.js";
 import { configureLogger } from "./utils/logger.js";
@@ -85,11 +85,8 @@ async function main() {
 
   serverInitializer(mcpServer);
 
-  // Initialize LLM config with server capabilities (one-time setup)
-  setLLMConfig(mcpServer);
-
-  // Now loadConfig() can access cached LLM config
-  const appConfig = loadConfig(overrides);
+  // Initialize config with server capabilities and overrides (one-time setup)
+  const appConfig = setConfig(mcpServer, overrides);
 
   app.use(express.json());
 

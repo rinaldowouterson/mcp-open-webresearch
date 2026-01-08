@@ -1,8 +1,8 @@
 import { Impit } from "impit";
-import { loadConfig } from "../../config/index.js";
+import { getConfig } from "../../config/index.js";
 import { SmartFetchOptions } from "../../types/index.js";
 
-// Lazy-initialized clients to avoid calling loadConfig() at module scope
+// Lazy-initialized clients to avoid calling getConfig() at module scope
 let browserClient: Impit | null = null;
 let standardClient: Impit | null = null;
 
@@ -11,7 +11,7 @@ let standardClient: Impit | null = null;
  */
 const getBrowserClient = (): Impit => {
   if (!browserClient) {
-    const config = loadConfig();
+    const config = getConfig();
     browserClient = new Impit({
       browser: "chrome",
       proxyUrl:
@@ -27,7 +27,7 @@ const getBrowserClient = (): Impit => {
  */
 const getStandardClient = (): Impit => {
   if (!standardClient) {
-    const config = loadConfig();
+    const config = getConfig();
     standardClient = new Impit({
       proxyUrl:
         config.proxy.enabled && config.proxy.url ? config.proxy.url : undefined,
