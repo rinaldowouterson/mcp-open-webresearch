@@ -26,8 +26,8 @@ export interface ProxyConfig {
  * apiKey is optional (local LLMs like Ollama don't need it).
  */
 export interface LlmConfig {
-  /** Whether LLM sampling is enabled (SAMPLING env var) */
-  enabled: boolean;
+  /** Whether environment allows LLM sampling */
+  samplingAllowed: boolean;
   /** Base URL for the OpenAI-compatible API (LLM_BASE_URL) */
   baseUrl: string | null;
   /** API key for authentication (LLM_API_KEY, optional for local models) */
@@ -38,8 +38,10 @@ export interface LlmConfig {
   timeoutMs: number;
   /** Skip IDE sampling and prefer external API (SKIP_IDE_SAMPLING) */
   skipIdeSampling: boolean;
-  /** Computed: true if baseUrl AND model are set */
-  isAvailable: boolean;
+  /** Whether external API sampling is available */
+  apiSamplingAvailable: boolean;
+  /** IDE supports LLM sampling */
+  ideSupportsSampling: boolean;
 }
 
 export interface AppConfig {

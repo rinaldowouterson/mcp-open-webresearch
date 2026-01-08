@@ -1,5 +1,6 @@
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { SocksProxyAgent } from "socks-proxy-agent";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   AppConfig,
   ProxyConfig,
@@ -8,6 +9,12 @@ import {
   LlmConfig,
 } from "../types/index.js";
 import { ConfigOverrides } from "../types/index.js";
+
+/**
+ * Module-level singleton for LLM configuration.
+ * Initialized once via setLLMConfig(server) during startup.
+ */
+let llmConfig: LlmConfig | null = null;
 
 const supportedProtocolPatterns = /^(https?|socks5):\/\//i;
 
@@ -101,38 +108,111 @@ const loadProxyConfig = (overrides?: ConfigOverrides): ProxyConfig => {
 };
 
 /**
- * Loads LLM configuration from environment variables.
- * isAvailable is true if baseUrl AND model are set.
- * apiKey is optional (for local LLMs like Ollama).
+ * Check if the MCP client supports LLM sampling capability.
+ * Called once during setLLMConfig to determine IDE availability.
  */
-const loadLlmConfig = (): LlmConfig => {
+const clientSupportsSampling = (server: McpServer): boolean => {
+  const capabilities = server.server.getClientCapabilities();
+  return !!capabilities?.sampling;
+};
+
+/**
+ * Initializes LLM configuration. Must be called once during server startup.
+ * Reads environment variables, checks server capabilities, and computes
+ * samplingAllowed based on README.md priority table.
+ */
+export const setLLMConfig = (server: McpServer): void => {
   const baseUrl = process.env.LLM_BASE_URL || null;
   const apiKey = process.env.LLM_API_KEY || null;
   const model = process.env.LLM_NAME || null;
-  const enabled = process.env.SAMPLING?.toLowerCase() === "true";
-  const timeoutMs = parseInt(process.env.LLM_TIMEOUT_MS || "30000", 10);
+  const apiSamplingAvailable = !!baseUrl && !!model;
+
   const skipIdeSampling =
     process.env.SKIP_IDE_SAMPLING?.toLowerCase() === "true";
+  const ideSupportsSampling = clientSupportsSampling(server);
+  const samplingEnabled = process.env.SAMPLING?.toLowerCase() === "true";
 
-  // Available if baseUrl AND model are set
-  // apiKey is optional (local models don't need it)
-  const isAvailable = !!baseUrl && !!model;
+  // Logic based on README.md priority table:
+  // Sampling is allowed if SAMPLING=true AND (IDE available OR API available)
+  const samplingAllowed =
+    samplingEnabled &&
+    ((ideSupportsSampling && !skipIdeSampling) || apiSamplingAvailable);
 
-  if (enabled && !isAvailable) {
+  const timeoutMs = parseInt(process.env.LLM_TIMEOUT_MS || "30000", 10);
+
+  if (samplingEnabled && !ideSupportsSampling && !apiSamplingAvailable) {
     console.debug(
-      "[Config] SAMPLING=true but LLM is not available. " +
-        "Set LLM_BASE_URL and LLM_NAME to enable LLM sampling.",
+      "Sampling is enabled but IDE does not support sampling and no API sampling is available.",
+    );
+    console.debug(
+      "Sampling is disabled until a valid LLM base url and model are set.",
     );
   }
 
-  return {
-    enabled,
+  llmConfig = {
+    samplingAllowed,
     baseUrl,
     apiKey,
     model,
     timeoutMs,
     skipIdeSampling,
-    isAvailable,
+    apiSamplingAvailable,
+    ideSupportsSampling,
+  };
+};
+
+/**
+ * Returns the cached LLM configuration.
+ * Throws an error if setLLMConfig() has not been called during startup.
+ */
+const loadLlmConfig = (): LlmConfig => {
+  if (!llmConfig) {
+    throw new Error(
+      "LLM config not initialized. Call setLLMConfig(server) first during startup.",
+    );
+  }
+  return llmConfig;
+};
+
+/**
+ * TEST ONLY: Resets the LLM config singleton for unit testing.
+ * Allows tests to initialize config based on env vars without a real server.
+ * @param ideSupportsSampling - Mocked IDE sampling capability (default: false)
+ */
+export const resetLLMConfigForTesting = (ideSupportsSampling = false): void => {
+  const baseUrl = process.env.LLM_BASE_URL || null;
+  const apiKey = process.env.LLM_API_KEY || null;
+  const model = process.env.LLM_NAME || null;
+  const apiSamplingAvailable = !!baseUrl && !!model;
+
+  const skipIdeSampling =
+    process.env.SKIP_IDE_SAMPLING?.toLowerCase() === "true";
+  const samplingEnabled = process.env.SAMPLING?.toLowerCase() === "true";
+
+  const samplingAllowed =
+    samplingEnabled &&
+    ((ideSupportsSampling && !skipIdeSampling) || apiSamplingAvailable);
+
+  const timeoutMs = parseInt(process.env.LLM_TIMEOUT_MS || "30000", 10);
+
+  if (samplingEnabled && !ideSupportsSampling && !apiSamplingAvailable) {
+    console.debug(
+      "Sampling is enabled but IDE does not support sampling and no API sampling is available.",
+    );
+    console.debug(
+      "Sampling is disabled until a valid LLM base url and model are set.",
+    );
+  }
+
+  llmConfig = {
+    samplingAllowed,
+    baseUrl,
+    apiKey,
+    model,
+    timeoutMs,
+    skipIdeSampling,
+    apiSamplingAvailable,
+    ideSupportsSampling,
   };
 };
 

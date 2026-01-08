@@ -10,7 +10,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
 import cors from "cors";
 import { program } from "commander";
-import { loadConfig } from "./config/index.js";
+import { loadConfig, setLLMConfig } from "./config/index.js";
 import { type ConfigOverrides } from "./types/ConfigOverrides.js";
 import { cleanBrowserSession } from "./engines/visit_page/visit.js";
 import { configureLogger } from "./utils/logger.js";
@@ -31,7 +31,7 @@ process.on("SIGINT", async () => {
 
 process.on("SIGHUP", async () => {
   console.debug(
-    "Received SIGHUP (terminal session ending), cleaning session..."
+    "Received SIGHUP (terminal session ending), cleaning session...",
   );
   await cleanBrowserSession();
   await closeWritingStream();
@@ -48,12 +48,11 @@ async function main() {
     .option(
       "--engines <items>",
       "Comma-separated list of search engines",
-      (value) => value.split(",")
+      (value) => value.split(","),
     )
     .option("--sampling", "Enable sampling for search results (default)")
     .option("--no-sampling", "Disable sampling for search results")
     .parse();
-
 
   const options = program.opts();
 
@@ -74,8 +73,6 @@ async function main() {
 
   await captureConsoleDebug();
 
-  const appConfig = loadConfig(overrides);
-
   const app = express();
 
   const mcpServer = new McpServer({
@@ -88,6 +85,12 @@ async function main() {
 
   serverInitializer(mcpServer);
 
+  // Initialize LLM config with server capabilities (one-time setup)
+  setLLMConfig(mcpServer);
+
+  // Now loadConfig() can access cached LLM config
+  const appConfig = loadConfig(overrides);
+
   app.use(express.json());
 
   if (appConfig.enableCors) {
@@ -95,7 +98,7 @@ async function main() {
       cors({
         origin: appConfig.corsOrigin || "*",
         methods: ["GET", "POST", "DELETE"],
-      })
+      }),
     );
     app.options("*", cors());
   }
@@ -146,7 +149,7 @@ async function main() {
 
   const handleSessionRequest = async (
     req: express.Request,
-    res: express.Response
+    res: express.Response,
   ) => {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     if (!sessionId || !transports.streamable[sessionId]) {
@@ -162,7 +165,9 @@ async function main() {
 
   app.delete("/mcp", handleSessionRequest);
 
-  const PORT = overrides.port || (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000);
+  const PORT =
+    overrides.port ||
+    (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000);
   const transport = new StdioServerTransport();
   await mcpServer
     .connect(transport)

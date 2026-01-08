@@ -113,14 +113,6 @@ const fetchDirectInference = async (prompt: string): Promise<string> => {
 };
 
 /**
- * Check if the client supports MCP sampling capability
- */
-export const clientSupportsSampling = (server: McpServer): boolean => {
-  const capabilities = server.server.getClientCapabilities();
-  return !!capabilities?.sampling;
-};
-
-/**
  * Filters search results using LLM-based relevance evaluation.
  *
  * Strategy priority:
@@ -135,14 +127,24 @@ export const filterResultsWithSampling = async (
   if (results.length === 0) return [];
 
   const config = loadConfig();
+
+  // Early exit if sampling is not allowed
+  if (!config.llm.samplingAllowed) {
+    console.debug("[Sampling] Sampling not allowed. Returning raw results.");
+    return results.slice(0, maxResults);
+  }
+
   // Build the prompt
   const formattedResults = formatResultsForEvaluation(results);
   const prompt = buildSamplingPrompt(query, formattedResults);
 
   let responseText = "";
-  const skipIdeSampling = config.llm.skipIdeSampling;
-  const ideAvailable = clientSupportsSampling(server);
-  const apiAvailable = config.llm.isAvailable;
+  // Use pre-computed config values from setLLMConfig
+  const {
+    skipIdeSampling,
+    ideSupportsSampling: ideAvailable,
+    apiSamplingAvailable: apiAvailable,
+  } = config.llm;
 
   try {
     // Determine strategy based on skipIdeSampling preference

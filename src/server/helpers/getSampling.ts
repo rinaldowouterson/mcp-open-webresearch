@@ -6,7 +6,7 @@ import { loadConfig } from "../../config/index.js";
  * Defaults to false if not set (sampling requires LLM configuration).
  */
 export const getSampling = (): boolean => {
-  return loadConfig().llm.enabled;
+  return loadConfig().llm.samplingAllowed;
 };
 
 /**
@@ -17,8 +17,9 @@ export const getSamplingResponse = () => {
   return createResponse(
     JSON.stringify(
       {
-        sampling: config.llm.enabled,
-        llm_available: config.llm.isAvailable,
+        sampling: config.llm.samplingAllowed,
+        llm_available: config.llm.apiSamplingAvailable,
+        ide_supports_sampling: config.llm.ideSupportsSampling,
         llm_model: config.llm.model,
       },
       null,
