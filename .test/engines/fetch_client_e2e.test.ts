@@ -344,3 +344,210 @@ describe("Fetch Engines E2E Tests", () => {
     expect(success).toBe(true);
   });
 });
+
+/**
+ * smartPost Proxy Tests
+ * Tests that smartPost (used by fetchDirectInference) respects proxy settings.
+ */
+describe("smartPost Proxy Tests", () => {
+  let proxyServer: mockttp.Mockttp | undefined;
+  let socksServer: any;
+
+  const originalEnv = { ...process.env };
+
+  beforeEach(async () => {
+    process.env = { ...originalEnv };
+    delete process.env.HTTPS_PROXY;
+    delete process.env.HTTP_PROXY;
+    delete process.env.SOCKS5_PROXY;
+
+    vi.resetModules();
+
+    // Allow self-signed certs for our local test proxy
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+    // Initialize config after module reset
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
+  });
+
+  afterEach(async () => {
+    process.env = { ...originalEnv };
+
+    if (proxyServer) {
+      await proxyServer.stop();
+      proxyServer = undefined;
+    }
+    if (socksServer) {
+      socksServer.close();
+      socksServer = undefined;
+    }
+    vi.restoreAllMocks();
+  });
+
+  it("should route POST requests through an HTTP proxy", async () => {
+    const { key, cert } = ensureTestCerts();
+
+    proxyServer = mockttp.getLocal({
+      https: { key, cert },
+    });
+    await proxyServer.start();
+
+    // Mock an LLM API endpoint
+    const mockEndpoint = await proxyServer
+      .forPost("/v1/chat/completions")
+      .thenReply(
+        200,
+        JSON.stringify({
+          choices: [{ message: { content: "1, 2" } }],
+        }),
+      );
+
+    const proxyUrl = proxyServer.url.replace("localhost", "127.0.0.1");
+
+    process.env.ENABLE_PROXY = "true";
+    process.env.HTTP_PROXY = proxyUrl;
+    delete process.env.HTTPS_PROXY;
+
+    // Reinitialize config with new proxy settings
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
+
+    const { smartPost } = await import("../../src/engines/fetch/client.js");
+
+    const response = await smartPost(`${proxyUrl}/v1/chat/completions`, {
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "test", messages: [] }),
+    });
+
+    expect(response.ok).toBe(true);
+    const text = await response.text();
+    expect(text).toContain("choices");
+
+    const seenRequests = await mockEndpoint.getSeenRequests();
+    expect(seenRequests.length).toBe(1);
+    // Verify the request was a POST with our body
+    expect(seenRequests[0].method).toBe("POST");
+  });
+
+  it("should route POST requests through a SOCKS5 proxy", async () => {
+    const socksPort = 0; // Dynamic
+    socksServer = await createSocksServer(socksPort);
+
+    let proxyConnected = false;
+    socksServer.on("proxyConnect", () => {
+      proxyConnected = true;
+    });
+
+    const address = socksServer.address();
+    const port = address.port;
+
+    process.env.ENABLE_PROXY = "true";
+    process.env.SOCKS5_PROXY = `socks5://localhost:${port}`;
+
+    // Reinitialize config with new proxy settings
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
+
+    const { smartPost } = await import("../../src/engines/fetch/client.js");
+
+    // Make a request that will go through the SOCKS proxy
+    // The actual external request might fail, but we verify the proxy was used
+    try {
+      await smartPost("https://httpbin.org/post", {
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ test: true }),
+      });
+    } catch (e) {
+      // Network errors are expected if httpbin is unreachable
+    }
+
+    // STRICT VERIFICATION: The SOCKS proxy MUST have received a connection attempt
+    expect(proxyConnected).toBe(true);
+  });
+
+  it("should authenticate with SOCKS5 proxy for POST requests", async () => {
+    const socksPort = 0;
+    let authAttempts = 0;
+    let success = false;
+
+    socksServer = await createSocksServer(socksPort, {
+      authenticate: (
+        username: string,
+        password: string,
+        socket: any,
+        callback: (err?: Error) => void,
+      ) => {
+        authAttempts++;
+        if (username === "apiuser" && password === "apipass") {
+          success = true;
+          callback();
+        } else {
+          callback(new Error("Authentication failed"));
+        }
+      },
+    });
+
+    const address = socksServer.address();
+    const port = address.port;
+
+    const username = "apiuser";
+    const password = "apipass";
+    process.env.ENABLE_PROXY = "true";
+    process.env.SOCKS5_PROXY = `socks5://${username}:${password}@localhost:${port}`;
+
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
+
+    const { smartPost } = await import("../../src/engines/fetch/client.js");
+
+    try {
+      await smartPost("https://httpbin.org/post", {
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ test: true }),
+      });
+    } catch (e) {
+      // Expected to fail on actual request but auth should have happened
+    }
+
+    expect(authAttempts).toBeGreaterThan(0);
+    expect(success).toBe(true);
+  });
+
+  it("should NOT use proxy when proxy is disabled", async () => {
+    // Create a SOCKS proxy that will fail the test if used
+    const socksPort = 0;
+    socksServer = await createSocksServer(socksPort);
+
+    let proxyWasUsed = false;
+    socksServer.on("proxyConnect", () => {
+      proxyWasUsed = true;
+    });
+
+    const address = socksServer.address();
+    const port = address.port;
+
+    // Set proxy URL but DISABLE proxy
+    process.env.ENABLE_PROXY = "false";
+    process.env.SOCKS5_PROXY = `socks5://localhost:${port}`;
+
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
+
+    const { smartPost } = await import("../../src/engines/fetch/client.js");
+
+    // Make a request to a local test server (or any reachable endpoint)
+    try {
+      // This will go direct (not through proxy) since proxy is disabled
+      await smartPost("https://example.com/", {
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ test: true }),
+      });
+    } catch (e) {
+      // Network errors are acceptable
+    }
+
+    // STRICT VERIFICATION: The proxy should NOT have been used
+    expect(proxyWasUsed).toBe(false);
+  });
+});

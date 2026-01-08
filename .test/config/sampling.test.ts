@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getSampling } from "../../src/server/helpers/getSampling.js";
-import {
-  getConfig,
-  resetConfigForTesting,
-} from "../../src/config/index.js";
+import { getConfig, resetConfigForTesting } from "../../src/config/index.js";
 
 // Mock fs to prevent file operations during tests
 vi.mock("fs/promises", async () => {
@@ -382,9 +379,10 @@ describe("Direct API Sampling (External LLM)", () => {
   });
 
   it("should use direct API when SKIP_IDE_SAMPLING=true", async () => {
-    // Mock fetch to simulate LLM API response
-    const mockFetch = vi.fn().mockResolvedValue({
+    // Mock smartPost to simulate LLM API response
+    const mockSmartPost = vi.fn().mockResolvedValue({
       ok: true,
+      status: 200,
       text: () =>
         Promise.resolve(
           JSON.stringify({
@@ -392,7 +390,10 @@ describe("Direct API Sampling (External LLM)", () => {
           }),
         ),
     });
-    global.fetch = mockFetch as any;
+
+    vi.doMock("../../src/engines/fetch/client.js", () => ({
+      smartPost: mockSmartPost,
+    }));
 
     // Initialize config after module reset
     const { resetConfigForTesting: resetConfig } =
@@ -439,12 +440,11 @@ describe("Direct API Sampling (External LLM)", () => {
       server: mockServer as any,
     });
 
-    // Verify fetch was called (direct API)
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch).toHaveBeenCalledWith(
+    // Verify smartPost was called (direct API)
+    expect(mockSmartPost).toHaveBeenCalledTimes(1);
+    expect(mockSmartPost).toHaveBeenCalledWith(
       "http://localhost:11434/v1/chat/completions",
       expect.objectContaining({
-        method: "POST",
         headers: expect.objectContaining({
           "Content-Type": "application/json",
         }),
@@ -468,8 +468,9 @@ describe("Direct API Sampling (External LLM)", () => {
   it("should include Authorization header when API key is set", async () => {
     process.env.LLM_API_KEY = "sk-test-key";
 
-    const mockFetch = vi.fn().mockResolvedValue({
+    const mockSmartPost = vi.fn().mockResolvedValue({
       ok: true,
+      status: 200,
       text: () =>
         Promise.resolve(
           JSON.stringify({
@@ -477,7 +478,10 @@ describe("Direct API Sampling (External LLM)", () => {
           }),
         ),
     });
-    global.fetch = mockFetch as any;
+
+    vi.doMock("../../src/engines/fetch/client.js", () => ({
+      smartPost: mockSmartPost,
+    }));
 
     // Initialize config after module reset
     const { resetConfigForTesting: resetConfig } =
@@ -513,7 +517,7 @@ describe("Direct API Sampling (External LLM)", () => {
     });
 
     // Verify Authorization header was included
-    expect(mockFetch).toHaveBeenCalledWith(
+    expect(mockSmartPost).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
         headers: expect.objectContaining({
@@ -524,8 +528,11 @@ describe("Direct API Sampling (External LLM)", () => {
   });
 
   it("should fallback to IDE when SKIP_IDE_SAMPLING=true but direct API fails and IDE is available", async () => {
-    const mockFetch = vi.fn().mockRejectedValue(new Error("Network error"));
-    global.fetch = mockFetch as any;
+    const mockSmartPost = vi.fn().mockRejectedValue(new Error("Network error"));
+
+    vi.doMock("../../src/engines/fetch/client.js", () => ({
+      smartPost: mockSmartPost,
+    }));
 
     // Initialize config with IDE support for fallback
     const { resetConfigForTesting: resetConfig } =
@@ -565,7 +572,7 @@ describe("Direct API Sampling (External LLM)", () => {
     });
 
     // Verify direct API was attempted and failed
-    expect(mockFetch).toHaveBeenCalled();
+    expect(mockSmartPost).toHaveBeenCalled();
     expect(consoleDebugSpy).toHaveBeenCalledWith(
       expect.stringContaining("Direct API failed"),
     );
