@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock config loader
 const mockLoadConfig = vi.fn();
 vi.mock("../../src/config/index", () => ({
-  loadConfig: mockLoadConfig,
+  getConfig: mockLoadConfig,
 }));
 
 // Mock Impit

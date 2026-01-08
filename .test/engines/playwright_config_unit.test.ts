@@ -4,15 +4,15 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { createLaunchOptionsForPlayWright } from "../../src/engines/visit_page/visit.js";
-import { loadConfig } from "../../src/config/index.js";
+import { getConfig } from "../../src/config/index.js";
 
 // Mock the config loader
 vi.mock("../../src/config/index.js", () => ({
-  loadConfig: vi.fn(),
+  getConfig: vi.fn(),
 }));
 
 describe("createLaunchOptionsForPlayWright", () => {
-  const mockLoadConfig = vi.mocked(loadConfig);
+  const mockLoadConfig = vi.mocked(getConfig);
   const consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
   
   afterEach(() => {

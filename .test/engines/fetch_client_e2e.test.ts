@@ -89,9 +89,8 @@ describe("Fetch Engines E2E Tests", () => {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
     // Initialize LLM config after module reset
-    const { resetLLMConfigForTesting } =
-      await import("../../src/config/index.js");
-    resetLLMConfigForTesting();
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
   });
 
   afterEach(async () => {
@@ -136,6 +135,10 @@ describe("Fetch Engines E2E Tests", () => {
     process.env.HTTP_PROXY = proxyUrl;
     delete process.env.HTTPS_PROXY;
 
+    // Reinitialize config with new proxy env vars
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
+
     const { fetchBingPage } = await import("../../src/engines/fetch/index.js");
 
     const result = await fetchBingPage("test query", 0);
@@ -165,6 +168,9 @@ describe("Fetch Engines E2E Tests", () => {
     process.env.HTTP_PROXY = proxyUrl;
     delete process.env.HTTPS_PROXY;
 
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
+
     const { fetchBingPage } = await import("../../src/engines/fetch/index.js");
 
     try {
@@ -190,10 +196,10 @@ describe("Fetch Engines E2E Tests", () => {
     delete process.env.SOCKS5_PROXY;
 
     vi.resetModules();
-    const { loadConfig, resetLLMConfigForTesting } =
+    const { getConfig, resetConfigForTesting } =
       await import("../../src/config/index.js");
-    resetLLMConfigForTesting();
-    const config = loadConfig();
+    resetConfigForTesting();
+    const config = getConfig();
 
     expect(config.proxy.enabled).toBe(false);
     expect(config.proxy.isValid).toBe(false);
@@ -213,6 +219,9 @@ describe("Fetch Engines E2E Tests", () => {
 
     process.env.ENABLE_PROXY = "true";
     process.env.SOCKS5_PROXY = `socks5://localhost:${port}`;
+
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
 
     // Re-import to load config and set agents
     const { fetchBingPage } = await import("../../src/engines/fetch/index.js");
@@ -245,6 +254,9 @@ describe("Fetch Engines E2E Tests", () => {
     process.env.ENABLE_PROXY = "true";
     process.env.HTTP_PROXY = proxyUrl;
 
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
+
     const { fetchBravePage } = await import("../../src/engines/fetch/index.js");
 
     const result = await fetchBravePage("test query", 0);
@@ -271,6 +283,9 @@ describe("Fetch Engines E2E Tests", () => {
 
     process.env.ENABLE_PROXY = "true";
     process.env.HTTP_PROXY = proxyUrl;
+
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
 
     const { fetchDuckDuckSearchPage } =
       await import("../../src/engines/fetch/index.js");
@@ -313,6 +328,9 @@ describe("Fetch Engines E2E Tests", () => {
     const password = "pass456";
     process.env.ENABLE_PROXY = "true";
     process.env.SOCKS5_PROXY = `socks5://${username}:${password}@localhost:${port}`;
+
+    const { resetConfigForTesting } = await import("../../src/config/index.js");
+    resetConfigForTesting();
 
     const { fetchBingPage } = await import("../../src/engines/fetch/index.js");
 

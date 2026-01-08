@@ -17,11 +17,11 @@ import {
 } from "../../src/engines/visit_page/visit.js";
 import { McpError, ErrorCode } from "../../src/types/mcp-error.js";
 import * as http from "http";
-import { loadConfig } from "../../src/config/index.js";
+import { getConfig } from "../../src/config/index.js";
 
 // Mock the config loader
 vi.mock("../../src/config/index.js", () => ({
-  loadConfig: vi.fn().mockReturnValue({
+  getConfig: vi.fn().mockReturnValue({
     proxy: {
       enabled: false,
       isValid: false,

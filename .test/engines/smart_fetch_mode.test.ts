@@ -35,7 +35,7 @@ describe("Smart Fetch Modes (Local Integration)", () => {
     async function loadSmartFetchWithConfig(ignoreTls: boolean) {
         // Mock the config to ensure ignoreTlsErrors matches our needs (mockttp uses self-signed/test certs)
         vi.doMock("../../src/config/index.js", () => ({
-            loadConfig: () => ({
+            getConfig: () => ({
                 proxy: { enabled: false },
                 ssl: { ignoreTlsErrors: ignoreTls }
             })

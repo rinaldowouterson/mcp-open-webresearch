@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-  loadConfig,
-  resetLLMConfigForTesting,
-} from "../../src/config/index.js";
+import { getConfig, resetConfigForTesting } from "../../src/config/index.js";
 import { ConfigOverrides } from "../../src/types/index.js";
 import {
   configureLogger,
@@ -35,7 +32,7 @@ describe("Config Loader", () => {
     configureLogger({ writeToTerminal: false, writeToFile: false });
 
     // Initialize LLM config singleton for tests
-    resetLLMConfigForTesting();
+    resetConfigForTesting();
   });
 
   afterEach(() => {
@@ -50,7 +47,8 @@ describe("Config Loader", () => {
     delete process.env.ENABLE_PROXY;
     delete process.env.SOCKS5_PROXY;
 
-    const config = loadConfig({});
+    resetConfigForTesting(false, {});
+    const config = getConfig();
     // Default engines are bing, duckduckgo, brave
     expect(config.defaultSearchEngines).toEqual([
       "bing",
@@ -72,7 +70,8 @@ describe("Config Loader", () => {
         proxyUrl: "socks5://user:pass@localhost:9050",
       };
 
-      const config = loadConfig(overrides);
+      resetConfigForTesting(false, overrides);
+      const config = getConfig();
       expect(config.proxy.enabled).toBe(true);
       expect(config.proxy.url).toBe("socks5://user:pass@localhost:9050");
       expect(config.proxy.port).toBe(9050);
@@ -87,7 +86,8 @@ describe("Config Loader", () => {
         engines: ["duckduckgo"],
       };
 
-      const config = loadConfig(overrides);
+      resetConfigForTesting(false, overrides);
+      const config = getConfig();
       expect(config.defaultSearchEngines).toEqual(["duckduckgo"]);
     });
 
@@ -109,7 +109,8 @@ describe("Config Loader", () => {
 
       // The loader will log an error. Since writeToTerminal is true,
       // the wrapper should call the original console.debug (our spy).
-      loadConfig(overrides);
+      resetConfigForTesting(false, overrides);
+      getConfig();
 
       expect(spy).toHaveBeenCalledWith(
         expect.stringContaining("loader: error detected: Invalid proxy URL"),
@@ -122,7 +123,8 @@ describe("Config Loader", () => {
       configureLogger({ writeToTerminal: false });
       // Note: console is already wrapped, we just updated the config it reads.
 
-      loadConfig({ ...overrides, debug: false });
+      resetConfigForTesting(false, { ...overrides, debug: false });
+      getConfig();
 
       // The loader WILL execute console.debug(...)
       // BUT the Logger Wrapper should intercept it, see writeToTerminal is false,
@@ -134,13 +136,15 @@ describe("Config Loader", () => {
   describe("Boolean Flags", () => {
     it("should parse --cors correctly", () => {
       process.env.ENABLE_CORS = "false";
-      const config = loadConfig({ cors: true });
+      resetConfigForTesting(false, { cors: true });
+      const config = getConfig();
       expect(config.enableCors).toBe(true);
     });
 
     it("should default --cors to false if not provided and env is false", () => {
       process.env.ENABLE_CORS = "false";
-      const config = loadConfig({});
+      resetConfigForTesting(false, {});
+      const config = getConfig();
       expect(config.enableCors).toBe(false);
     });
   });
@@ -150,7 +154,8 @@ describe("Config Loader", () => {
       const overrides: ConfigOverrides = {
         proxyUrl: "socks5://user:pass@localhost:9050",
       };
-      const config = loadConfig(overrides);
+      resetConfigForTesting(false, overrides);
+      const config = getConfig();
       expect(config.proxy.isValid).toBe(true);
       expect(config.proxy.protocol).toBe("socks5");
       expect(config.proxy.host).toBe("localhost");
@@ -165,7 +170,8 @@ describe("Config Loader", () => {
         proxyUrl: "notaproxy://localhost",
         debug: true, // enable debug to see if it catches error
       };
-      const config = loadConfig(overrides);
+      resetConfigForTesting(false, overrides);
+      const config = getConfig();
       expect(config.proxy.isValid).toBe(false);
       expect(config.proxy.error).toBeDefined();
       expect(spy).toHaveBeenCalled(); // Should log error
@@ -188,8 +194,9 @@ describe("Config Loader", () => {
       process.env.SAMPLING = "true";
       process.env.LLM_TIMEOUT_MS = "5000";
 
-      resetLLMConfigForTesting(); // Re-init with new env vars
-      const config = loadConfig();
+      resetConfigForTesting(); // Re-init with new env vars
+      resetConfigForTesting(false);
+      const config = getConfig();
 
       expect(config.llm.baseUrl).toBe("https://api.example.com/v1");
       expect(config.llm.apiKey).toBe("test-key");
@@ -204,8 +211,9 @@ describe("Config Loader", () => {
       process.env.LLM_NAME = "llama3.2";
       // No API key - local model
 
-      resetLLMConfigForTesting();
-      const config = loadConfig();
+      resetConfigForTesting();
+      resetConfigForTesting(false);
+      const config = getConfig();
 
       expect(config.llm.apiSamplingAvailable).toBe(true);
       expect(config.llm.apiKey).toBeNull();
@@ -216,8 +224,9 @@ describe("Config Loader", () => {
       process.env.LLM_API_KEY = "test-key";
       // No model
 
-      resetLLMConfigForTesting();
-      const config = loadConfig();
+      resetConfigForTesting();
+      resetConfigForTesting(false);
+      const config = getConfig();
 
       expect(config.llm.apiSamplingAvailable).toBe(false);
     });
@@ -227,8 +236,8 @@ describe("Config Loader", () => {
       process.env.SAMPLING = "true";
       // No LLM config
 
-      resetLLMConfigForTesting();
-      loadConfig();
+      resetConfigForTesting();
+      getConfig();
 
       expect(spy).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -238,7 +247,8 @@ describe("Config Loader", () => {
     });
 
     it("should default timeoutMs to 30000 when not set", () => {
-      const config = loadConfig();
+      resetConfigForTesting(false);
+      const config = getConfig();
       expect(config.llm.timeoutMs).toBe(30000);
     });
   });
