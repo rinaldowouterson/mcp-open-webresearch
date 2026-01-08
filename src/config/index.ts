@@ -181,7 +181,21 @@ export const setConfig = (
 
   const enableCors = overrides?.cors ?? process.env.ENABLE_CORS === "true";
 
+  const isDocker = process.env.DOCKER_ENVIRONMENT === "true";
+  const chromiumPath = process.env.CHROMIUM_EXECUTABLE_PATH;
+
+  // Logging
+  const logPath = process.env.MCP_LOG_PATH || "mcp-debug.log"; // Default filename
+  // The absolute path resolution happens in logger if needed, or here.
+  // We'll pass the raw string and let logger resolve it or resolve it here if we want strictness.
+  // Best to resolve it in logger or keep it as is, but we must be consistent.
+  // The existing logger used: process.env.MCP_LOG_PATH || path.resolve(process.cwd(), "mcp-debug.log")
+  // We will replicate that logic there or pass it in. Let's pass the raw value from env/override.
+
   const config: AppConfig = {
+    port:
+      overrides?.port ||
+      (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000),
     defaultSearchEngines,
     proxy: loadProxyConfig(overrides),
     enableCors,
@@ -189,7 +203,29 @@ export const setConfig = (
     ssl: {
       ignoreTlsErrors: process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0",
     },
+    docker: {
+      isDocker,
+      chromiumPath,
+    },
+    logging: {
+      level: "debug", // Fixed for now as we only have debug
+      path: logPath,
+      writeToTerminal:
+        overrides?.debug ?? process.env.WRITE_DEBUG_TERMINAL === "true",
+      writeToFile:
+        !!overrides?.debugFile || process.env.WRITE_DEBUG_FILE === "true",
+    },
     llm: buildLlmConfig(server),
+    deepSearch: {
+      maxLoops: parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "3", 10),
+      resultsPerEngine: parseInt(
+        process.env.DEEP_SEARCH_RESULTS_PER_ENGINE || "3",
+        10,
+      ),
+      saturationThreshold: parseFloat(
+        process.env.DEEP_SEARCH_SATURATION_THRESHOLD || "0.6",
+      ),
+    },
   };
 
   appConfig = Object.freeze(config);
@@ -252,12 +288,27 @@ export const resetConfigForTesting = (
   const enableCors = overrides?.cors ?? process.env.ENABLE_CORS === "true";
 
   appConfig = Object.freeze({
+    port:
+      overrides?.port ||
+      (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000),
     defaultSearchEngines,
     proxy: loadProxyConfig(overrides),
     enableCors,
     corsOrigin: process.env.CORS_ORIGIN || "*",
     ssl: {
       ignoreTlsErrors: process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0",
+    },
+    docker: {
+      isDocker: process.env.DOCKER_ENVIRONMENT === "true",
+      chromiumPath: process.env.CHROMIUM_EXECUTABLE_PATH,
+    },
+    logging: {
+      level: "debug",
+      path: process.env.MCP_LOG_PATH || "mcp-debug.log",
+      writeToTerminal:
+        overrides?.debug ?? process.env.WRITE_DEBUG_TERMINAL === "true",
+      writeToFile:
+        !!overrides?.debugFile || process.env.WRITE_DEBUG_FILE === "true",
     },
     llm: {
       samplingAllowed,
@@ -269,5 +320,54 @@ export const resetConfigForTesting = (
       apiSamplingAvailable,
       ideSupportsSampling,
     },
+    deepSearch: {
+      maxLoops: parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "3", 10),
+      resultsPerEngine: parseInt(
+        process.env.DEEP_SEARCH_RESULTS_PER_ENGINE || "3",
+        10,
+      ),
+      saturationThreshold: parseFloat(
+        process.env.DEEP_SEARCH_SATURATION_THRESHOLD || "0.6",
+      ),
+    },
   });
+};
+
+/**
+ * Updates the configurations default search engines at runtime
+ */
+export const updateDefaultSearchEngines = (engines: string[]): void => {
+  if (!appConfig) return;
+  const newConfig = { ...appConfig, defaultSearchEngines: [...engines] };
+  appConfig = Object.freeze(newConfig);
+  console.debug(
+    `Runtime config updated: defaultSearchEngines=${engines.join(",")}`,
+  );
+};
+
+/**
+ * Updates the sampling configuration at runtime.
+ * Recalculates samplingAllowed based on existing capabilities.
+ */
+export const updateSamplingConfig = (enabled: boolean): void => {
+  if (!appConfig) return;
+
+  const { ideSupportsSampling, skipIdeSampling, apiSamplingAvailable } =
+    appConfig.llm;
+
+  const samplingAllowed =
+    enabled &&
+    ((ideSupportsSampling && !skipIdeSampling) || apiSamplingAvailable);
+
+  const newLlmConfig: LlmConfig = {
+    ...appConfig.llm,
+    samplingAllowed,
+  };
+
+  const newConfig = { ...appConfig, llm: newLlmConfig };
+
+  appConfig = Object.freeze(newConfig);
+  console.debug(
+    `Runtime config updated: sampling=${enabled}, allowed=${samplingAllowed}`,
+  );
 };

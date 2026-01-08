@@ -88,6 +88,10 @@ async function main() {
   // Initialize config with server capabilities and overrides (one-time setup)
   const appConfig = setConfig(mcpServer, overrides);
 
+  // Configure logger based on the loaded configuration
+  // This is the CRITICAL STEP ensuring logger is ready before any heavy lifting
+  configureLogger(appConfig.logging);
+
   app.use(express.json());
 
   if (appConfig.enableCors) {
@@ -162,9 +166,7 @@ async function main() {
 
   app.delete("/mcp", handleSessionRequest);
 
-  const PORT =
-    overrides.port ||
-    (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000);
+  const PORT = appConfig.port;
   const transport = new StdioServerTransport();
   await mcpServer
     .connect(transport)

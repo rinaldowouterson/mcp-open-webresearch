@@ -44,11 +44,36 @@ export interface LlmConfig {
   ideSupportsSampling: boolean;
 }
 
+export interface DeepSearchConfig {
+  maxLoops: number;
+  resultsPerEngine: number;
+  saturationThreshold: number;
+}
+
 export interface AppConfig {
+  // Server port
+  port: number;
+
   // Search engine configuration (array of engine names to use by default)
   defaultSearchEngines: string[];
+
   // Proxy configuration
   proxy: ProxyConfig;
+
+  // Docker / Browser Ops
+  docker: {
+    isDocker: boolean;
+    chromiumPath: string | undefined;
+  };
+
+  // Logging
+  logging: {
+    level: string; // implied by flags
+    path: string;
+    writeToTerminal: boolean;
+    writeToFile: boolean;
+  };
+
   // CORS configuration
   enableCors: boolean;
   corsOrigin: string;
@@ -56,6 +81,10 @@ export interface AppConfig {
   ssl: {
     ignoreTlsErrors: boolean;
   };
+
   // LLM configuration for sampling
   llm: LlmConfig;
+
+  // Deep Search Configuration
+  deepSearch: DeepSearchConfig;
 }

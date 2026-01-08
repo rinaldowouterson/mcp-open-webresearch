@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { getEngineNames } from "../../engines/search/registry.js";
 import { createResponse } from "./createResponse.js";
+import { updateDefaultSearchEngines as updateConfig } from "../../config/index.js";
 
 /**
  * Updates default search engines in config and persists to .env file
@@ -13,7 +14,7 @@ export const updateDefaultSearchEngines = async (engines: string[]) => {
   if (validEngines.length === 0) {
     return createResponse(
       `No valid search engines provided. Available: ${supportedEngines.join(", ")}`,
-      true
+      true,
     );
   }
 
@@ -32,7 +33,7 @@ export const updateDefaultSearchEngines = async (engines: string[]) => {
       if (envContents.includes("DEFAULT_SEARCH_ENGINES=")) {
         envContents = envContents.replace(
           /DEFAULT_SEARCH_ENGINES=.*/,
-          `DEFAULT_SEARCH_ENGINES=${validEngines.join(",")}`
+          `DEFAULT_SEARCH_ENGINES=${validEngines.join(",")}`,
         );
       } else {
         envContents += `\nDEFAULT_SEARCH_ENGINES=${validEngines.join(",")}\n`;
@@ -42,10 +43,11 @@ export const updateDefaultSearchEngines = async (engines: string[]) => {
     }
 
     await fs.writeFile(envPath, envContents);
-    process.env.DEFAULT_SEARCH_ENGINES = validEngines.join(",");
+    // Update runtime config
+    updateConfig(validEngines);
 
     return createResponse(
-      `Updated default engines to: ${validEngines.join(", ")} and persisted to .env`
+      `Updated default engines to: ${validEngines.join(", ")} and persisted to .env`,
     );
   } catch (error) {
     const errorMessage =

@@ -29,6 +29,13 @@ vi.mock("../../src/config/index.js", () => ({
       error: null,
       agent: null,
     },
+    docker: {
+      isDocker: false,
+      chromiumPath: undefined,
+    },
+    ssl: {
+      ignoreTlsErrors: false,
+    },
   }),
 }));
 

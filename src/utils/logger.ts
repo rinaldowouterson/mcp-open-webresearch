@@ -2,17 +2,20 @@ import fs from "fs/promises";
 import path from "path";
 import { format } from "util";
 
-const LOG_PATH =
-  process.env.MCP_LOG_PATH || path.resolve(process.cwd(), "mcp-debug.log");
+const LOG_PATH_DEFAULT = "mcp-debug.log";
+// We default global logger config to strict safety: no output until configured.
+// This ensures that unit tests or scripts don't accidentally write logs unless they mean to.
 
 interface LoggerConfig {
   writeToTerminal: boolean;
   writeToFile: boolean;
+  path: string;
 }
 
 const loggerConfig: LoggerConfig = {
-  writeToTerminal: process.env.WRITE_DEBUG_TERMINAL === "true",
-  writeToFile: process.env.WRITE_DEBUG_FILE === "true",
+  writeToTerminal: false,
+  writeToFile: false,
+  path: LOG_PATH_DEFAULT,
 };
 
 export function configureLogger(options: Partial<LoggerConfig>) {
@@ -22,6 +25,9 @@ export function configureLogger(options: Partial<LoggerConfig>) {
   if (options.writeToFile !== undefined) {
     loggerConfig.writeToFile = options.writeToFile;
   }
+  if (options.path !== undefined) {
+    loggerConfig.path = options.path;
+  }
 }
 
 let stream: fs.FileHandle | null = null;
@@ -29,15 +35,20 @@ let stream: fs.FileHandle | null = null;
 async function initStream(): Promise<void> {
   try {
     // Ensure the log file exists before proceeding
+    // We resolve the path relative to cwd if it's not absolute, or just use it as is if it's absolute
+    const logPath = path.isAbsolute(loggerConfig.path)
+      ? loggerConfig.path
+      : path.resolve(process.cwd(), loggerConfig.path);
+
     await fs
-      .access(LOG_PATH)
+      .access(logPath)
       .catch((error: any) =>
         error.code === "ENOENT"
-          ? fs.writeFile(LOG_PATH, "")
+          ? fs.writeFile(logPath, "")
           : Promise.reject(error),
       );
 
-    stream = await fs.open(LOG_PATH, "a");
+    stream = await fs.open(logPath, "a");
   } catch (error) {
     console.debug("Failed to initialize log stream:", error);
   }
@@ -99,7 +110,7 @@ export async function captureConsoleDebug(): Promise<void> {
 
 export async function clearLogFile(): Promise<void> {
   try {
-    await fs.unlink(LOG_PATH);
+    await fs.unlink(loggerConfig.path);
   } catch (error) {
     // File doesn't exist or other error - ignore
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {

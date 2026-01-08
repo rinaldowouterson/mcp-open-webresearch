@@ -111,10 +111,10 @@ async function ensureBrowser(): Promise<Page> {
 
 export function createLaunchOptionsForPlayWright() {
   const config = getConfig();
-  const launchOptions: LaunchOptions = process.env.DOCKER_ENVIRONMENT
+  const launchOptions: LaunchOptions = config.docker.isDocker
     ? {
         headless: true,
-        executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
+        executablePath: config.docker.chromiumPath,
       }
     : {
         headless: true,

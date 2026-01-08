@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { createResponse } from "./createResponse.js";
+import { updateSamplingConfig } from "../../config/index.js";
 
 /**
  * Updates sampling setting in config and persists to .env file
@@ -19,10 +20,7 @@ export const updateSampling = async (enabled: boolean) => {
       envContents = await fs.readFile(envPath, "utf-8");
 
       if (envContents.includes("SAMPLING=")) {
-        envContents = envContents.replace(
-          /SAMPLING=.*/,
-          `SAMPLING=${enabled}`
-        );
+        envContents = envContents.replace(/SAMPLING=.*/, `SAMPLING=${enabled}`);
       } else {
         envContents += `\nSAMPLING=${enabled}\n`;
       }
@@ -31,10 +29,11 @@ export const updateSampling = async (enabled: boolean) => {
     }
 
     await fs.writeFile(envPath, envContents);
-    process.env.SAMPLING = String(enabled);
+    // Update runtime config
+    updateSamplingConfig(enabled);
 
     return createResponse(
-      `Sampling ${enabled ? "enabled" : "disabled"} and persisted to .env`
+      `Sampling ${enabled ? "enabled" : "disabled"} and persisted to .env`,
     );
   } catch (error) {
     const errorMessage =
