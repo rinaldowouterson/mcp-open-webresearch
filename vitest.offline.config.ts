@@ -16,6 +16,7 @@ export default defineConfig({
       ".test/engines/throttle.test.ts",
       ".test/utils/**/*.test.ts",
       ".test/isValidUrl.test.ts",
+      ".test/server/helpers/executeMultiEngineSearch.test.ts",
       // Integration tests using local mock servers (mockttp, http.Server)
       ".test/engines/smart_fetch_mode.test.ts",
       ".test/engines/playwright_visit_e2e.test.ts",
