@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { loadConfig } from "../../src/config/index.js";
+import {
+  loadConfig,
+  resetLLMConfigForTesting,
+} from "../../src/config/index.js";
 import { ConfigOverrides } from "../../src/types/index.js";
 import {
   configureLogger,
@@ -30,6 +33,9 @@ describe("Config Loader", () => {
 
     // Reset logger configuration to defaults
     configureLogger({ writeToTerminal: false, writeToFile: false });
+
+    // Initialize LLM config singleton for tests
+    resetLLMConfigForTesting();
   });
 
   afterEach(() => {
@@ -182,35 +188,38 @@ describe("Config Loader", () => {
       process.env.SAMPLING = "true";
       process.env.LLM_TIMEOUT_MS = "5000";
 
+      resetLLMConfigForTesting(); // Re-init with new env vars
       const config = loadConfig();
 
       expect(config.llm.baseUrl).toBe("https://api.example.com/v1");
       expect(config.llm.apiKey).toBe("test-key");
       expect(config.llm.model).toBe("test-model");
-      expect(config.llm.enabled).toBe(true);
+      expect(config.llm.samplingAllowed).toBe(true);
       expect(config.llm.timeoutMs).toBe(5000);
-      expect(config.llm.isAvailable).toBe(true);
+      expect(config.llm.apiSamplingAvailable).toBe(true);
     });
 
-    it("should compute isAvailable correctly for local LLM (no apiKey)", () => {
+    it("should compute apiSamplingAvailable correctly for local LLM (no apiKey)", () => {
       process.env.LLM_BASE_URL = "http://localhost:11434/v1";
       process.env.LLM_NAME = "llama3.2";
       // No API key - local model
 
+      resetLLMConfigForTesting();
       const config = loadConfig();
 
-      expect(config.llm.isAvailable).toBe(true);
+      expect(config.llm.apiSamplingAvailable).toBe(true);
       expect(config.llm.apiKey).toBeNull();
     });
 
-    it("should compute isAvailable = false when model is missing", () => {
+    it("should compute apiSamplingAvailable = false when model is missing", () => {
       process.env.LLM_BASE_URL = "http://localhost:11434/v1";
       process.env.LLM_API_KEY = "test-key";
       // No model
 
+      resetLLMConfigForTesting();
       const config = loadConfig();
 
-      expect(config.llm.isAvailable).toBe(false);
+      expect(config.llm.apiSamplingAvailable).toBe(false);
     });
 
     it("should log warning when SAMPLING=true but LLM not available", () => {
@@ -218,10 +227,13 @@ describe("Config Loader", () => {
       process.env.SAMPLING = "true";
       // No LLM config
 
+      resetLLMConfigForTesting();
       loadConfig();
 
       expect(spy).toHaveBeenCalledWith(
-        expect.stringContaining("SAMPLING=true but LLM is not available"),
+        expect.stringContaining(
+          "Sampling is enabled but IDE does not support sampling",
+        ),
       );
     });
 

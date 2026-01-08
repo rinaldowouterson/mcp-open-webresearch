@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getSampling } from "../../src/server/helpers/getSampling.js";
-import { loadConfig } from "../../src/config/index.js";
+import {
+  loadConfig,
+  resetLLMConfigForTesting,
+} from "../../src/config/index.js";
 
 // Mock fs to prevent file operations during tests
 vi.mock("fs/promises", async () => {
@@ -25,6 +28,9 @@ describe("Sampling Configuration", () => {
     delete process.env.LLM_API_KEY;
     delete process.env.LLM_NAME;
     delete process.env.LLM_TIMEOUT_MS;
+    delete process.env.SKIP_IDE_SAMPLING;
+    // Initialize LLM config singleton
+    resetLLMConfigForTesting();
   });
 
   afterEach(() => {
@@ -44,11 +50,17 @@ describe("Sampling Configuration", () => {
 
     it("should return true when SAMPLING is 'true'", () => {
       process.env.SAMPLING = "true";
+      process.env.LLM_BASE_URL = "http://localhost:11434/v1";
+      process.env.LLM_NAME = "llama3.2";
+      resetLLMConfigForTesting();
       expect(getSampling()).toBe(true);
     });
 
     it("should return true when SAMPLING is 'TRUE' (case insensitive)", () => {
       process.env.SAMPLING = "TRUE";
+      process.env.LLM_BASE_URL = "http://localhost:11434/v1";
+      process.env.LLM_NAME = "llama3.2";
+      resetLLMConfigForTesting();
       expect(getSampling()).toBe(true);
     });
 
@@ -64,43 +76,47 @@ describe("Sampling Configuration", () => {
   });
 
   describe("LlmConfig in loadConfig", () => {
-    it("should have llm.isAvailable = false when no LLM env vars set", () => {
+    it("should have llm.apiSamplingAvailable = false when no LLM env vars set", () => {
       const config = loadConfig();
-      expect(config.llm.isAvailable).toBe(false);
-      expect(config.llm.enabled).toBe(false);
+      expect(config.llm.apiSamplingAvailable).toBe(false);
+      expect(config.llm.samplingAllowed).toBe(false);
       expect(config.llm.baseUrl).toBeNull();
       expect(config.llm.apiKey).toBeNull();
       expect(config.llm.model).toBeNull();
     });
 
-    it("should have llm.isAvailable = false when only baseUrl is set (model required)", () => {
+    it("should have llm.apiSamplingAvailable = false when only baseUrl is set (model required)", () => {
       process.env.LLM_BASE_URL = "http://localhost:11434/v1";
+      resetLLMConfigForTesting();
       const config = loadConfig();
-      expect(config.llm.isAvailable).toBe(false);
+      expect(config.llm.apiSamplingAvailable).toBe(false);
       expect(config.llm.baseUrl).toBe("http://localhost:11434/v1");
     });
 
-    it("should have llm.isAvailable = false when only model is set (baseUrl required)", () => {
+    it("should have llm.apiSamplingAvailable = false when only model is set (baseUrl required)", () => {
       process.env.LLM_NAME = "llama3.2";
+      resetLLMConfigForTesting();
       const config = loadConfig();
-      expect(config.llm.isAvailable).toBe(false);
+      expect(config.llm.apiSamplingAvailable).toBe(false);
       expect(config.llm.model).toBe("llama3.2");
     });
 
-    it("should have llm.isAvailable = true when baseUrl AND model are set (apiKey optional)", () => {
+    it("should have llm.apiSamplingAvailable = true when baseUrl AND model are set (apiKey optional)", () => {
       process.env.LLM_BASE_URL = "http://localhost:11434/v1";
       process.env.LLM_NAME = "llama3.2";
+      resetLLMConfigForTesting();
       const config = loadConfig();
-      expect(config.llm.isAvailable).toBe(true);
+      expect(config.llm.apiSamplingAvailable).toBe(true);
       expect(config.llm.apiKey).toBeNull(); // Optional
     });
 
-    it("should have llm.isAvailable = true with full cloud config", () => {
+    it("should have llm.apiSamplingAvailable = true with full cloud config", () => {
       process.env.LLM_BASE_URL = "https://openrouter.ai/api/v1";
       process.env.LLM_API_KEY = "sk-test-key";
       process.env.LLM_NAME = "google/gemini-2.0-flash-001";
+      resetLLMConfigForTesting();
       const config = loadConfig();
-      expect(config.llm.isAvailable).toBe(true);
+      expect(config.llm.apiSamplingAvailable).toBe(true);
       expect(config.llm.baseUrl).toBe("https://openrouter.ai/api/v1");
       expect(config.llm.apiKey).toBe("sk-test-key");
       expect(config.llm.model).toBe("google/gemini-2.0-flash-001");
@@ -113,14 +129,18 @@ describe("Sampling Configuration", () => {
 
     it("should parse custom LLM_TIMEOUT_MS", () => {
       process.env.LLM_TIMEOUT_MS = "15000";
+      resetLLMConfigForTesting();
       const config = loadConfig();
       expect(config.llm.timeoutMs).toBe(15000);
     });
 
-    it("should set llm.enabled = true when SAMPLING=true", () => {
+    it("should set llm.samplingAllowed = true when SAMPLING=true and LLM available", () => {
       process.env.SAMPLING = "true";
+      process.env.LLM_BASE_URL = "http://localhost:11434/v1";
+      process.env.LLM_NAME = "llama3.2";
+      resetLLMConfigForTesting();
       const config = loadConfig();
-      expect(config.llm.enabled).toBe(true);
+      expect(config.llm.samplingAllowed).toBe(true);
     });
   });
 });
@@ -135,6 +155,7 @@ describe("filterResultsWithSampling", () => {
     delete process.env.LLM_BASE_URL;
     delete process.env.LLM_API_KEY;
     delete process.env.LLM_NAME;
+    delete process.env.SKIP_IDE_SAMPLING;
   });
 
   afterEach(() => {
@@ -143,13 +164,24 @@ describe("filterResultsWithSampling", () => {
   });
 
   it("should import filterResultsWithSampling without error", async () => {
+    const { resetLLMConfigForTesting: resetConfig } =
+      await import("../../src/config/index.js");
+    resetConfig();
     const module =
       await import("../../src/server/helpers/filterResultsWithSampling.js");
     expect(module.filterResultsWithSampling).toBeDefined();
-    expect(module.clientSupportsSampling).toBeDefined();
+    // clientSupportsSampling was moved to config/index.ts
   });
 
   it("should filter results using MCP Protocol when LLM not available", async () => {
+    // Enable sampling and IDE support
+    process.env.SAMPLING = "true";
+
+    // Must dynamically import after vi.resetModules()
+    const { resetLLMConfigForTesting: resetConfig } =
+      await import("../../src/config/index.js");
+    resetConfig(true); // IDE supports sampling
+
     const { filterResultsWithSampling } =
       await import("../../src/server/helpers/filterResultsWithSampling.js");
 
@@ -215,6 +247,11 @@ describe("filterResultsWithSampling", () => {
   });
 
   it("should return raw results when no LLM and no client sampling support", async () => {
+    // Sampling disabled (no IDE, no API)
+    const { resetLLMConfigForTesting: resetConfig } =
+      await import("../../src/config/index.js");
+    resetConfig(false);
+
     const { filterResultsWithSampling } =
       await import("../../src/server/helpers/filterResultsWithSampling.js");
 
@@ -246,14 +283,20 @@ describe("filterResultsWithSampling", () => {
       server: mockServer as any,
     });
 
-    // Should return unfiltered
+    // Should return unfiltered (sampling not allowed)
     expect(filtered).toHaveLength(1);
     expect(consoleDebugSpy).toHaveBeenCalledWith(
-      expect.stringContaining("No LLM available and client lacks sampling"),
+      expect.stringContaining("Sampling not allowed"),
     );
   });
 
   it("should return empty array when LLM responds with 'none'", async () => {
+    // Enable sampling with IDE support
+    process.env.SAMPLING = "true";
+    const { resetLLMConfigForTesting: resetConfig } =
+      await import("../../src/config/index.js");
+    resetConfig(true);
+
     const { filterResultsWithSampling } =
       await import("../../src/server/helpers/filterResultsWithSampling.js");
 
@@ -324,10 +367,12 @@ describe("Direct API Sampling (External LLM)", () => {
     vi.resetModules();
     process.env = { ...originalEnv };
     // Set up LLM config for direct API
+    process.env.SAMPLING = "true";
     process.env.LLM_BASE_URL = "http://localhost:11434/v1";
     process.env.LLM_NAME = "llama3.2";
     process.env.SKIP_IDE_SAMPLING = "true"; // Force direct API usage
     delete process.env.LLM_API_KEY; // Local model, no key
+    // Note: resetLLMConfigForTesting must be called after dynamic import in each test
   });
 
   afterEach(() => {
@@ -348,6 +393,11 @@ describe("Direct API Sampling (External LLM)", () => {
         ),
     });
     global.fetch = mockFetch as any;
+
+    // Initialize config after module reset
+    const { resetLLMConfigForTesting: resetConfig } =
+      await import("../../src/config/index.js");
+    resetConfig();
 
     const { filterResultsWithSampling } =
       await import("../../src/server/helpers/filterResultsWithSampling.js");
@@ -429,6 +479,11 @@ describe("Direct API Sampling (External LLM)", () => {
     });
     global.fetch = mockFetch as any;
 
+    // Initialize config after module reset
+    const { resetLLMConfigForTesting: resetConfig } =
+      await import("../../src/config/index.js");
+    resetConfig();
+
     const { filterResultsWithSampling } =
       await import("../../src/server/helpers/filterResultsWithSampling.js");
 
@@ -471,6 +526,11 @@ describe("Direct API Sampling (External LLM)", () => {
   it("should fallback to IDE when SKIP_IDE_SAMPLING=true but direct API fails and IDE is available", async () => {
     const mockFetch = vi.fn().mockRejectedValue(new Error("Network error"));
     global.fetch = mockFetch as any;
+
+    // Initialize config with IDE support for fallback
+    const { resetLLMConfigForTesting: resetConfig } =
+      await import("../../src/config/index.js");
+    resetConfig(true); // IDE supports sampling for fallback
 
     const { filterResultsWithSampling } =
       await import("../../src/server/helpers/filterResultsWithSampling.js");
@@ -523,6 +583,11 @@ describe("Direct API Sampling (External LLM)", () => {
 
     const mockFetch = vi.fn();
     global.fetch = mockFetch as any;
+
+    // Initialize config with IDE support
+    const { resetLLMConfigForTesting: resetConfig } =
+      await import("../../src/config/index.js");
+    resetConfig(true); // IDE supports sampling
 
     const { filterResultsWithSampling } =
       await import("../../src/server/helpers/filterResultsWithSampling.js");

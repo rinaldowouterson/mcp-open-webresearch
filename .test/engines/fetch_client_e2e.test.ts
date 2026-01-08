@@ -76,7 +76,7 @@ describe("Fetch Engines E2E Tests", () => {
 
   const originalEnv = { ...process.env };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env = { ...originalEnv };
     // CRITICAL: Unset system proxy vars so tests use our local test proxies
     delete process.env.HTTPS_PROXY;
@@ -87,6 +87,11 @@ describe("Fetch Engines E2E Tests", () => {
 
     // Allow self-signed certs for our local test proxy
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+    // Initialize LLM config after module reset
+    const { resetLLMConfigForTesting } =
+      await import("../../src/config/index.js");
+    resetLLMConfigForTesting();
   });
 
   afterEach(async () => {
@@ -185,7 +190,9 @@ describe("Fetch Engines E2E Tests", () => {
     delete process.env.SOCKS5_PROXY;
 
     vi.resetModules();
-    const { loadConfig } = await import("../../src/config/index.js");
+    const { loadConfig, resetLLMConfigForTesting } =
+      await import("../../src/config/index.js");
+    resetLLMConfigForTesting();
     const config = loadConfig();
 
     expect(config.proxy.enabled).toBe(false);
