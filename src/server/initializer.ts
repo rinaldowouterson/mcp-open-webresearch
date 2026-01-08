@@ -112,7 +112,7 @@ export const serverInitializer = (mcpServer: McpServer): void => {
           .max(50)
           .default(10)
           .describe(
-            "Maximum number of results to return. Current default is 10. Maximum is 50. It's distributed across engines.",
+            "Maximum number of results to return PER ENGINE. Default is 10. Max is 50. Total results is the sum of all engines' results.",
           ),
         engines: z
           .array(z.string())

@@ -4,23 +4,12 @@ import { mergeSearchResults } from "./signalProcessor.js";
 import { MergedSearchResult } from "../../types/MergedSearchResult.js";
 
 /**
- * Distributes search limit across multiple engines
- */
-export const distributeSearchLimit = (
-  totalLimit: number,
-  engineCount: number,
-): number[] => {
-  const base = Math.floor(totalLimit / engineCount);
-  const remainder = totalLimit % engineCount;
-  return Array.from(
-    { length: engineCount },
-    (_, i) => base + (i < remainder ? 1 : 0),
-  );
-};
-
-/**
  * Executes search across specified engines using dynamic registry.
  * Returns merged results with consensus scoring.
+ *
+ * NOTE: maxResults is applied PER ENGINE.
+ * If you request 10 results and use 3 engines, you may process up to 30 raw results
+ * before deduplication and merging.
  */
 export const executeMultiEngineSearch = async (
   query: string,
@@ -62,16 +51,11 @@ export const executeMultiEngineSearch = async (
     }
   }
 
-  // Distribute search limit across engines
-  const engineLimits = distributeSearchLimit(
-    maxResults,
-    availableEngines.length,
-  );
-
   // Fan-out: Execute all searches in parallel
-  const searchPromises = availableEngines.map((name, index) => {
+  // We request maxResults from EACH engine (additive strategy)
+  const searchPromises = availableEngines.map((name) => {
     const engine = allEngines.get(name)!;
-    return engine.search(cleanQuery, engineLimits[index]);
+    return engine.search(cleanQuery, maxResults);
   });
 
   // Use Promise.allSettled for resilience (partial results on failure)
@@ -102,7 +86,8 @@ export const executeMultiEngineSearch = async (
   });
 
   // Merge and rank results by consensus
+  // The merge logic handles deduplication properly
   const mergedResults = mergeSearchResults(successfulResults);
 
-  return mergedResults.slice(0, maxResults);
+  return mergedResults;
 };
