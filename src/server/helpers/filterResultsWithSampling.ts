@@ -1,8 +1,8 @@
 import { MergedSearchResult } from "../../types/MergedSearchResult.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getConfig } from "../../config/index.js";
 import { buildSamplingPrompt } from "../../prompts/index.js";
 import { SamplingFilterOptions } from "../../types/SamplingFilterOptions.js";
+import { smartPost } from "../../engines/fetch/client.js";
 
 /**
  * Formats search results as a numbered list for LLM evaluation
@@ -56,6 +56,7 @@ const parseApprovedIndices = (response: string): number[] => {
 /**
  * Calls an OpenAI-compatible API directly.
  * Uses config.llm for all settings (baseUrl, apiKey, model, timeout).
+ * Respects proxy settings via smartPost.
  */
 const fetchDirectInference = async (prompt: string): Promise<string> => {
   const config = getConfig();
@@ -66,50 +67,53 @@ const fetchDirectInference = async (prompt: string): Promise<string> => {
   }
 
   console.debug(`[Sampling] Using direct API: ${model} at ${baseUrl}`);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    // Only add Authorization header if API key is provided
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
-    }
-
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful assistant evaluating search results.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0,
-      }),
-      signal: controller.signal,
-    });
-
-    const responseTextRaw = await response.text();
-
-    if (!response.ok) {
-      throw new Error(
-        `Inference API Error (${response.status}): ${responseTextRaw}`,
-      );
-    }
-
-    const data = JSON.parse(responseTextRaw);
-    return data.choices?.[0]?.message?.content || "";
-  } finally {
-    clearTimeout(timeoutId);
+  if (config.proxy.enabled) {
+    console.debug(`[Sampling] Routing through proxy: ${config.proxy.url}`);
   }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  // Only add Authorization header if API key is provided
+  if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+
+  // Implement timeout with Promise.race since Impit doesn't support AbortSignal
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error(`Request timeout after ${timeoutMs}ms`)),
+      timeoutMs,
+    ),
+  );
+
+  const fetchPromise = smartPost(`${baseUrl}/chat/completions`, {
+    headers,
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant evaluating search results.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+    }),
+  });
+
+  const response = await Promise.race([fetchPromise, timeoutPromise]);
+  const responseTextRaw = await response.text();
+
+  if (!response.ok) {
+    throw new Error(
+      `Inference API Error (${response.status}): ${responseTextRaw}`,
+    );
+  }
+
+  const data = JSON.parse(responseTextRaw);
+  return data.choices?.[0]?.message?.content || "";
 };
 
 /**
@@ -140,15 +144,12 @@ export const filterResultsWithSampling = async (
 
   let responseText = "";
   // Use pre-computed config values from setLLMConfig
-  const {
-    skipIdeSampling,
-    ideSupportsSampling: ideAvailable,
-    apiSamplingAvailable: apiAvailable,
-  } = config.llm;
+  const { skipIdeSampling, ideSupportsSampling, apiSamplingAvailable } =
+    config.llm;
 
   try {
     // Determine strategy based on skipIdeSampling preference
-    if (skipIdeSampling && apiAvailable) {
+    if (skipIdeSampling && apiSamplingAvailable) {
       // User explicitly wants to skip IDE sampling
       console.debug("[Sampling] SKIP_IDE_SAMPLING=true, using direct API...");
       try {
@@ -156,7 +157,7 @@ export const filterResultsWithSampling = async (
       } catch (directError: any) {
         console.debug(`[Sampling] Direct API failed: ${directError.message}`);
         // Graceful degradation to IDE if available
-        if (ideAvailable) {
+        if (ideSupportsSampling) {
           console.debug("[Sampling] Falling back to IDE sampling...");
           const response = await server.server.createMessage({
             messages: [
@@ -171,7 +172,7 @@ export const filterResultsWithSampling = async (
           return results.slice(0, maxResults);
         }
       }
-    } else if (!skipIdeSampling && ideAvailable) {
+    } else if (!skipIdeSampling && ideSupportsSampling) {
       // Prefer IDE sampling (default behavior)
       console.debug("[Sampling] Using MCP Protocol sampling...");
       const response = await server.server.createMessage({
@@ -180,7 +181,7 @@ export const filterResultsWithSampling = async (
       });
       responseText =
         response.content.type === "text" ? response.content.text : "";
-    } else if (apiAvailable) {
+    } else if (apiSamplingAvailable) {
       // IDE not available but API is
       console.debug("[Sampling] IDE not available, using direct API...");
       try {
@@ -192,14 +193,14 @@ export const filterResultsWithSampling = async (
 
     // Final fallback check
     if (!responseText) {
-      if (!ideAvailable && !apiAvailable) {
+      if (!ideSupportsSampling && !apiSamplingAvailable) {
         console.debug(
           "[Sampling] No LLM available and client lacks sampling. Using raw results.",
         );
         return results.slice(0, maxResults);
       }
       // Try IDE as last resort if not yet tried
-      if (ideAvailable && !skipIdeSampling) {
+      if (ideSupportsSampling && !skipIdeSampling) {
         console.debug("[Sampling] Using MCP Protocol sampling...");
         const response = await server.server.createMessage({
           messages: [{ role: "user", content: { type: "text", text: prompt } }],

@@ -66,3 +66,43 @@ export async function smartFetch(url: string, options: SmartFetchOptions = {}) {
     throw error;
   }
 }
+
+/**
+ * Options for smartPost requests
+ */
+export interface SmartPostOptions {
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+/**
+ * Response from smartPost
+ */
+export interface SmartPostResponse {
+  ok: boolean;
+  status: number;
+  text: () => Promise<string>;
+}
+
+/**
+ * A proxy-aware POST utility for API calls.
+ * Uses the standard (non-browser) client to respect proxy settings.
+ */
+export async function smartPost(
+  url: string,
+  options: SmartPostOptions = {},
+): Promise<SmartPostResponse> {
+  const client = getStandardClient();
+
+  const response = await client.fetch(url, {
+    method: "POST",
+    headers: options.headers,
+    body: options.body,
+  });
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    text: () => response.text(),
+  };
+}
