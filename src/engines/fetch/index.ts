@@ -1,9 +1,8 @@
 import { loadConfig } from "../../config/index.js";
 import { smartFetch } from "./client.js";
 
-const config = loadConfig();
-
 function fetchLogs() {
+  const config = loadConfig();
   console.debug(`fetch: Config enabled? ${config.proxy.enabled}`);
   console.debug(`fetch: Proxy URL:`, config.proxy.url);
 }
@@ -19,7 +18,7 @@ function fetchLogs() {
 async function fetchBingPage(query: string, page: number): Promise<string> {
   try {
     fetchLogs();
-    
+
     const params = new URLSearchParams({
       q: query,
       first: (1 + page * 10).toString(),
@@ -31,14 +30,14 @@ async function fetchBingPage(query: string, page: number): Promise<string> {
 
     const url = `https://www.bing.com/search?${params.toString()}`;
     console.debug(`fetch: Fetching Bing page (browser-like): ${url}`);
-    
+
     // Bing requires browser impersonation
     return await smartFetch(url, { browserMode: true });
   } catch (error) {
     throw new Error(
       `Bing search failed: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
     );
   }
 }
@@ -69,7 +68,7 @@ async function fetchBravePage(query: string, offset: number): Promise<string> {
     throw new Error(
       `Brave search failed: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
     );
   }
 }
@@ -80,9 +79,7 @@ async function fetchBravePage(query: string, offset: number): Promise<string> {
  * @returns HTML content string
  * @throws Error if request fails
  */
-async function fetchDuckDuckGo(
-  url: string,
-): Promise<string> {
+async function fetchDuckDuckGo(url: string): Promise<string> {
   fetchLogs();
   // DuckDuckGo prefers standard http client (no TLS fingerprinting/impersonation)
   // We explicitly disable browser mode.
@@ -96,7 +93,7 @@ async function fetchDuckDuckGo(
  */
 async function fetchDuckDuckSearchPage(query: string): Promise<string> {
   return fetchDuckDuckGo(
-    `https://duckduckgo.com/?q=${encodeURIComponent(query)}&t=h_&ia=web`
+    `https://duckduckgo.com/?q=${encodeURIComponent(query)}&t=h_&ia=web`,
   );
 }
 
@@ -108,7 +105,7 @@ async function fetchDuckDuckSearchPage(query: string): Promise<string> {
  */
 async function fetchDuckDuckApiResults(
   apiUrlFromHTML: string,
-  offset: number
+  offset: number,
 ): Promise<string> {
   // Construct the final API URL with offset
   const apiUrlWithOffset = ((): string => {
