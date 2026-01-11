@@ -147,6 +147,22 @@ const buildLlmConfig = (server: McpServer): LlmConfig => {
     );
   }
 
+  const ideSelectedButApiAvailable =
+    samplingEnabled &&
+    !ideSupportsSampling &&
+    !skipIdeSampling &&
+    apiSamplingAvailable;
+
+  const apiSelectedButIdeAvailable =
+    samplingEnabled &&
+    ideSupportsSampling &&
+    skipIdeSampling &&
+    !apiSamplingAvailable;
+
+  // Primary strategy flags
+  const useApiFirst = skipIdeSampling && apiSamplingAvailable;
+  const useIdeFirst = !skipIdeSampling && ideSupportsSampling;
+
   return {
     samplingAllowed,
     baseUrl,
@@ -156,6 +172,10 @@ const buildLlmConfig = (server: McpServer): LlmConfig => {
     skipIdeSampling,
     apiSamplingAvailable,
     ideSupportsSampling,
+    ideSelectedButApiAvailable,
+    apiSelectedButIdeAvailable,
+    useApiFirst,
+    useIdeFirst,
   };
 };
 
@@ -216,6 +236,7 @@ export const setConfig = (
         !!overrides?.debugFile || process.env.WRITE_DEBUG_FILE === "true",
     },
     llm: buildLlmConfig(server),
+    skipCooldown: process.env.SKIP_COOLDOWN?.toLowerCase() === "true",
     deepSearch: {
       maxLoops: parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "3", 10),
       resultsPerEngine: parseInt(
@@ -224,6 +245,10 @@ export const setConfig = (
       ),
       saturationThreshold: parseFloat(
         process.env.DEEP_SEARCH_SATURATION_THRESHOLD || "0.6",
+      ),
+      maxCitationUrls: parseInt(
+        process.env.DEEP_SEARCH_MAX_CITATION_URLS || "10",
+        10,
       ),
     },
   };
@@ -319,7 +344,20 @@ export const resetConfigForTesting = (
       skipIdeSampling,
       apiSamplingAvailable,
       ideSupportsSampling,
+      ideSelectedButApiAvailable:
+        samplingEnabled &&
+        !ideSupportsSampling &&
+        !skipIdeSampling &&
+        apiSamplingAvailable,
+      apiSelectedButIdeAvailable:
+        samplingEnabled &&
+        ideSupportsSampling &&
+        skipIdeSampling &&
+        !apiSamplingAvailable,
+      useApiFirst: skipIdeSampling && apiSamplingAvailable,
+      useIdeFirst: !skipIdeSampling && ideSupportsSampling,
     },
+    skipCooldown: process.env.SKIP_COOLDOWN?.toLowerCase() === "true",
     deepSearch: {
       maxLoops: parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "3", 10),
       resultsPerEngine: parseInt(
@@ -328,6 +366,10 @@ export const resetConfigForTesting = (
       ),
       saturationThreshold: parseFloat(
         process.env.DEEP_SEARCH_SATURATION_THRESHOLD || "0.6",
+      ),
+      maxCitationUrls: parseInt(
+        process.env.DEEP_SEARCH_MAX_CITATION_URLS || "10",
+        10,
       ),
     },
   });

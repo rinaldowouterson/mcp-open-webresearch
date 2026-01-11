@@ -14,6 +14,9 @@ import { setConfig } from "./config/index.js";
 import { type ConfigOverrides } from "./types/ConfigOverrides.js";
 import { cleanBrowserSession } from "./engines/visit_page/visit.js";
 import { configureLogger } from "./utils/logger.js";
+import { mcpServer } from "./server/instance.js";
+
+export { mcpServer };
 
 process.on("SIGTERM", async () => {
   console.debug("Received SIGTERM (VSCode closing), cleaning session...");
@@ -74,11 +77,6 @@ async function main() {
   await captureConsoleDebug();
 
   const app = express();
-
-  const mcpServer = new McpServer({
-    name: "open-webresearch",
-    version: "25.12.28",
-  });
 
   // Initialize engine registry before registering tools
   await initEngineRegistry();

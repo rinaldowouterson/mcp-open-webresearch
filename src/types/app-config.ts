@@ -42,12 +42,22 @@ export interface LlmConfig {
   apiSamplingAvailable: boolean;
   /** IDE supports LLM sampling */
   ideSupportsSampling: boolean;
+  /** Sampling was enabled but IDE does not support sampling and no API sampling is available */
+  ideSelectedButApiAvailable: boolean;
+  /** Sampling was enabled but API sampling is not available and IDE supports sampling */
+  apiSelectedButIdeAvailable: boolean;
+  /** Primary strategy: use API first (skipIdeSampling=true && apiSamplingAvailable=true) */
+  useApiFirst: boolean;
+  /** Primary strategy: use IDE first (default when IDE is available) */
+  useIdeFirst: boolean;
 }
 
 export interface DeepSearchConfig {
   maxLoops: number;
   resultsPerEngine: number;
   saturationThreshold: number;
+  /** Max URLs to visit for citation extraction (-1 = no limit) */
+  maxCitationUrls: number;
 }
 
 export interface AppConfig {
@@ -84,6 +94,9 @@ export interface AppConfig {
 
   // LLM configuration for sampling
   llm: LlmConfig;
+
+  // Skip engine throttle cooldowns during search
+  skipCooldown: boolean;
 
   // Deep Search Configuration
   deepSearch: DeepSearchConfig;
