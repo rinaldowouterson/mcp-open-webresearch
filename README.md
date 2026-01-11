@@ -101,6 +101,85 @@ To run the server locally (e.g., in Claude Desktop or Cline):
 
 ---
 
+## Client Configuration & Timeouts
+
+Deep Search processes can take several minutes to complete. Some MCP clients (like Cline and RooCode) have a default timeout of 60 seconds, which will cause the operation to fail.
+
+**You MUST configure a higher timeout in your client settings.**
+
+### Cline (`cline_mcp_settings.json`)
+
+Add the `"timeout"` parameter (in seconds). Recommended: `1800` (30 minutes).
+
+```json
+{
+  "mcpServers": {
+    "open-webresearch": {
+      "disabled": false,
+      "timeout": 1800,
+      "type": "stdio",
+      "command": "npm",
+      "args": [
+        "run",
+        "start:sampling",
+        "--silent",
+        "--prefix",
+        "/absolute/path/to/mcp-open-webresearch"
+      ],
+      "autoApprove": []
+    }
+  }
+}
+```
+
+### RooCode (`mcp_settings.json`)
+
+RooCode also respects the `timeout` parameter.
+
+```json
+{
+  "mcpServers": {
+    "open-webresearch": {
+      "disabled": false,
+      "timeout": 1800,
+      "command": "npm",
+      "args": [
+        "run",
+        "start:sampling",
+        "--silent",
+        "--prefix",
+        "/absolute/path/to/mcp-open-webresearch"
+      ],
+      "alwaysAllow": []
+    }
+  }
+}
+```
+
+### Antigravity / Windsurf (`mcp_config.json`)
+
+Antigravity / Windsurf handles long-running tools natively, but if they let you configure a timeout, it is best practice to do so.
+
+```json
+{
+  "mcpServers": {
+    "open-webresearch": {
+      "command": "npm",
+      "args": [
+        "run",
+        "start:sampling",
+        "--silent",
+        "--prefix",
+        "/absolute/path/to/mcp-open-webresearch"
+      ],
+      "disabled": false
+    }
+  }
+}
+```
+
+---
+
 ## Developer Guide: Adding New Engines
 
 To add a new search engine:

@@ -12,7 +12,8 @@
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
     "watch": "tsc --watch",
-    "inspector": "npx @modelcontextprotocol/inspector node --env-file=.env build/index.js",
+    "inspector": "npm run build && npx @modelcontextprotocol/inspector node --env-file=.env build/index.js",
+    "inspector:timeout": "npm run build && export MCP_SERVER_REQUEST_TIMEOUT=1200000 && export MCP_REQUEST_MAX_TOTAL_TIMEOUT=1200000 && export MCP_REQUEST_TIMEOUT_RESET_ON_PROGRESS=true && npx @modelcontextprotocol/inspector node --env-file=.env build/index.js",
     "start": "node --env-file=.env build/index.js",
     "start:sampling": "node --env-file=.env build/index.js",
     "test": "vitest run",
