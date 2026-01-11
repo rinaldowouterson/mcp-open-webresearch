@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { executeMultiEngineSearch } from "../../../src/server/helpers/executeMultiEngineSearch.js";
 import * as Registry from "../../../src/engines/search/registry.js";
+import * as Config from "../../../src/config/index.js";
 import { SearchEngine } from "../../../src/types/search.js";
 import { SearchResult } from "../../../src/types/index.js";
+import { AppConfig } from "../../../src/types/app-config.js";
 
 // Implement a Mock Engine Factory
-const createMockEngine = (name: string): SearchEngine => ({
+const createMockEngine = (name: string, rateLimited = false): SearchEngine => ({
   name,
   search: vi
     .fn()
@@ -20,7 +22,17 @@ const createMockEngine = (name: string): SearchEngine => ({
         }));
       },
     ),
-  isRateLimited: () => false,
+  isRateLimited: () => rateLimited,
+});
+
+// Create minimal mock config
+const createMockConfig = (skipCooldown: boolean): Partial<AppConfig> => ({
+  skipCooldown,
+  deepSearch: {
+    maxLoops: 3,
+    resultsPerEngine: 3,
+    saturationThreshold: 0.6,
+  },
 });
 
 describe("executeMultiEngineSearch", () => {
@@ -37,6 +49,11 @@ describe("executeMultiEngineSearch", () => {
 
     // Mock the registry module
     vi.spyOn(Registry, "getEngines").mockResolvedValue(mockEngines);
+
+    // Mock config with skipCooldown=false by default
+    vi.spyOn(Config, "getConfig").mockReturnValue(
+      createMockConfig(false) as AppConfig,
+    );
   });
 
   afterEach(() => {
@@ -95,5 +112,75 @@ describe("executeMultiEngineSearch", () => {
 
     // Total results: 3 from mock1 + 3 from mock2 = 6
     expect(results.length).toBe(6);
+  });
+
+  describe("skipCooldown config", () => {
+    it("should skip rate-limited engines when skipCooldown=false", async () => {
+      // Mock one engine as rate-limited
+      mockEngines.set("mock1", createMockEngine("mock1", true)); // rate-limited
+      mockEngines.set("mock2", createMockEngine("mock2", false));
+
+      vi.spyOn(Config, "getConfig").mockReturnValue(
+        createMockConfig(false) as AppConfig,
+      );
+
+      const results = await executeMultiEngineSearch(
+        "test query",
+        ["mock1", "mock2"],
+        3,
+      );
+
+      // Only mock2 should be called (mock1 is rate-limited)
+      expect(mockEngines.get("mock1")!.search).not.toHaveBeenCalled();
+      expect(mockEngines.get("mock2")!.search).toHaveBeenCalled();
+
+      // Only 3 results from mock2
+      expect(results.length).toBe(3);
+    });
+
+    it("should include rate-limited engines when skipCooldown=true", async () => {
+      // Mock one engine as rate-limited
+      mockEngines.set("mock1", createMockEngine("mock1", true)); // rate-limited
+      mockEngines.set("mock2", createMockEngine("mock2", false));
+
+      vi.spyOn(Config, "getConfig").mockReturnValue(
+        createMockConfig(true) as AppConfig,
+      );
+
+      const results = await executeMultiEngineSearch(
+        "test query",
+        ["mock1", "mock2"],
+        3,
+      );
+
+      // Both engines should be called (skipCooldown ignores rate limit)
+      expect(mockEngines.get("mock1")!.search).toHaveBeenCalled();
+      expect(mockEngines.get("mock2")!.search).toHaveBeenCalled();
+
+      // 3 from mock1 + 3 from mock2 = 6
+      expect(results.length).toBe(6);
+    });
+
+    it("should respect skipCooldown even when all engines are rate-limited", async () => {
+      // Both engines rate-limited
+      mockEngines.set("mock1", createMockEngine("mock1", true));
+      mockEngines.set("mock2", createMockEngine("mock2", true));
+
+      vi.spyOn(Config, "getConfig").mockReturnValue(
+        createMockConfig(true) as AppConfig,
+      );
+
+      const results = await executeMultiEngineSearch(
+        "test query",
+        ["mock1", "mock2"],
+        3,
+      );
+
+      // Both should be called despite rate limiting
+      expect(mockEngines.get("mock1")!.search).toHaveBeenCalled();
+      expect(mockEngines.get("mock2")!.search).toHaveBeenCalled();
+
+      expect(results.length).toBe(6);
+    });
   });
 });

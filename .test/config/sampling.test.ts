@@ -239,7 +239,7 @@ describe("filterResultsWithSampling", () => {
     expect(filtered[1].title).toBe("Result 3");
 
     expect(consoleDebugSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[Sampling] Using MCP Protocol sampling..."),
+      expect.stringContaining("[LLM] Using IDE sampling"),
     );
   });
 
@@ -574,7 +574,7 @@ describe("Direct API Sampling (External LLM)", () => {
     // Verify direct API was attempted and failed
     expect(mockSmartPost).toHaveBeenCalled();
     expect(consoleDebugSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Direct API failed"),
+      expect.stringContaining("[LLM] Primary strategy failed"),
     );
 
     // Verify graceful degradation to IDE
@@ -631,7 +631,7 @@ describe("Direct API Sampling (External LLM)", () => {
     // Verify IDE was preferred, fetch NOT called
     expect(mockFetch).not.toHaveBeenCalled();
     expect(consoleDebugSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Using MCP Protocol sampling"),
+      expect.stringContaining("[LLM] Using IDE sampling"),
     );
     expect(mockSdkServer.createMessage).toHaveBeenCalled();
     expect(filtered).toHaveLength(1);
