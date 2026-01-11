@@ -321,6 +321,10 @@ async function extractContentAsMarkdown(
   }
 }
 
+async function extractVisibleText(page: Page): Promise<string> {
+  return await page.evaluate(() => document.body.innerText);
+}
+
 export async function visitPage(
   url: string,
   takeScreenshot = false,
@@ -338,10 +342,14 @@ export async function visitPage(
     await safePageNavigation(page, url);
     const title = await page.title();
     const content = await extractContentAsMarkdown(page);
+    // After markdown extraction (which cleans the DOM), extract the visible text
+    const textContent = await extractVisibleText(page);
+
     const result: VisitResult = {
       url,
       title,
       content,
+      textContent,
       screenshot: undefined,
     };
 

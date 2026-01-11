@@ -2,10 +2,10 @@ import { MergedSearchResult } from "../../types/MergedSearchResult.js";
 import { getConfig } from "../../config/index.js";
 import { buildSamplingPrompt } from "../../prompts/index.js";
 import { SamplingFilterOptions } from "../../types/SamplingFilterOptions.js";
-import { smartPost } from "../../engines/fetch/client.js";
+import { callLLM, isLLMAvailable } from "./callLLM.js";
 
 /**
- * Formats search results as a numbered list for LLM evaluation
+ * Formats search results as a numbered list for LLM evaluation.
  */
 const formatResultsForEvaluation = (results: MergedSearchResult[]): string => {
   return results
@@ -19,7 +19,7 @@ const formatResultsForEvaluation = (results: MergedSearchResult[]): string => {
 };
 
 /**
- * Parses the LLM response to extract approved result indices
+ * Parses the LLM response to extract approved result indices.
  * Expects comma-separated numbers like "1,3,5,7"
  */
 const parseApprovedIndices = (response: string): number[] => {
@@ -53,81 +53,17 @@ const parseApprovedIndices = (response: string): number[] => {
     .filter((index) => index >= 0);
 };
 
-/**
- * Calls an OpenAI-compatible API directly.
- * Uses config.llm for all settings (baseUrl, apiKey, model, timeout).
- * Respects proxy settings via smartPost.
- */
-const fetchDirectInference = async (prompt: string): Promise<string> => {
-  const config = getConfig();
-  const { baseUrl, apiKey, model, timeoutMs } = config.llm;
-
-  if (!baseUrl || !model) {
-    throw new Error("LLM not configured: baseUrl and model are required");
-  }
-
-  console.debug(`[Sampling] Using direct API: ${model} at ${baseUrl}`);
-  if (config.proxy.enabled) {
-    console.debug(`[Sampling] Routing through proxy: ${config.proxy.url}`);
-  }
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  // Only add Authorization header if API key is provided
-  if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
-  }
-
-  // Implement timeout with Promise.race since Impit doesn't support AbortSignal
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(
-      () => reject(new Error(`Request timeout after ${timeoutMs}ms`)),
-      timeoutMs,
-    ),
-  );
-
-  const fetchPromise = smartPost(`${baseUrl}/chat/completions`, {
-    headers,
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant evaluating search results.",
-        },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0,
-    }),
-  });
-
-  const response = await Promise.race([fetchPromise, timeoutPromise]);
-  const responseTextRaw = await response.text();
-
-  if (!response.ok) {
-    throw new Error(
-      `Inference API Error (${response.status}): ${responseTextRaw}`,
-    );
-  }
-
-  const data = JSON.parse(responseTextRaw);
-  return data.choices?.[0]?.message?.content || "";
-};
+const SAMPLING_SYSTEM_PROMPT =
+  "You are a helpful assistant evaluating search results for relevance and quality.";
 
 /**
  * Filters search results using LLM-based relevance evaluation.
- *
- * Strategy priority:
- * 1. If skipIdeSampling=true AND external LLM is available: use direct API only
- * 2. If skipIdeSampling=false: try IDE sampling first, fallback to direct API
- * 3. Fallback to unfiltered results if neither works
+ * Uses the centralized callLLM utility for all LLM interactions.
  */
 export const filterResultsWithSampling = async (
   options: SamplingFilterOptions,
 ): Promise<MergedSearchResult[]> => {
-  const { query, results, maxResults, server } = options;
+  const { query, results, maxResults } = options;
   if (results.length === 0) return [];
 
   const config = getConfig();
@@ -138,87 +74,38 @@ export const filterResultsWithSampling = async (
     return results.slice(0, maxResults);
   }
 
+  // Check if any LLM is available
+  if (!isLLMAvailable()) {
+    console.debug("[Sampling] No LLM available. Returning raw results.");
+    return results.slice(0, maxResults);
+  }
+
   // Build the prompt
   const formattedResults = formatResultsForEvaluation(results);
-  const prompt = buildSamplingPrompt(query, formattedResults);
-
-  let responseText = "";
-  // Use pre-computed config values from setLLMConfig
-  const { skipIdeSampling, ideSupportsSampling, apiSamplingAvailable } =
-    config.llm;
+  const userPrompt = buildSamplingPrompt(query, formattedResults);
 
   try {
-    // Determine strategy based on skipIdeSampling preference
-    if (skipIdeSampling && apiSamplingAvailable) {
-      // User explicitly wants to skip IDE sampling
-      console.debug("[Sampling] SKIP_IDE_SAMPLING=true, using direct API...");
-      try {
-        responseText = await fetchDirectInference(prompt);
-      } catch (directError: any) {
-        console.debug(`[Sampling] Direct API failed: ${directError.message}`);
-        // Graceful degradation to IDE if available
-        if (ideSupportsSampling) {
-          console.debug("[Sampling] Falling back to IDE sampling...");
-          const response = await server.server.createMessage({
-            messages: [
-              { role: "user", content: { type: "text", text: prompt } },
-            ],
-            maxTokens: 100,
-          });
-          responseText =
-            response.content.type === "text" ? response.content.text : "";
-        } else {
-          console.debug("[Sampling] No fallback available. Using raw results.");
-          return results.slice(0, maxResults);
-        }
-      }
-    } else if (!skipIdeSampling && ideSupportsSampling) {
-      // Prefer IDE sampling (default behavior)
-      console.debug("[Sampling] Using MCP Protocol sampling...");
-      const response = await server.server.createMessage({
-        messages: [{ role: "user", content: { type: "text", text: prompt } }],
+    const llmResult = await callLLM(
+      {
+        systemPrompt: SAMPLING_SYSTEM_PROMPT,
+        userPrompt,
         maxTokens: 100,
-      });
-      responseText =
-        response.content.type === "text" ? response.content.text : "";
-    } else if (apiSamplingAvailable) {
-      // IDE not available but API is
-      console.debug("[Sampling] IDE not available, using direct API...");
-      try {
-        responseText = await fetchDirectInference(prompt);
-      } catch (directError: any) {
-        console.debug(`[Sampling] Direct API failed: ${directError.message}`);
-      }
-    }
+        temperature: 0,
+      },
+      options.server,
+    );
 
-    // Final fallback check
-    if (!responseText) {
-      if (!ideSupportsSampling && !apiSamplingAvailable) {
-        console.debug(
-          "[Sampling] No LLM available and client lacks sampling. Using raw results.",
-        );
-        return results.slice(0, maxResults);
-      }
-      // Try IDE as last resort if not yet tried
-      if (ideSupportsSampling && !skipIdeSampling) {
-        console.debug("[Sampling] Using MCP Protocol sampling...");
-        const response = await server.server.createMessage({
-          messages: [{ role: "user", content: { type: "text", text: prompt } }],
-          maxTokens: 100,
-        });
-        responseText =
-          response.content.type === "text" ? response.content.text : "";
-      }
-    }
+    console.debug(
+      `[Sampling] Decision received via ${llmResult.provider}: ${llmResult.text}`,
+    );
 
-    // --- PROCESS RESPONSE ---
-    console.debug(`[Sampling] Decision received: ${responseText}`);
-
-    if (responseText.toLowerCase().includes("none")) {
+    // Handle "none" response
+    if (llmResult.text.toLowerCase().includes("none")) {
       return [];
     }
 
-    const approvedIndices = parseApprovedIndices(responseText);
+    // Parse approved indices
+    const approvedIndices = parseApprovedIndices(llmResult.text);
 
     if (approvedIndices.length === 0) {
       console.debug(
@@ -235,7 +122,7 @@ export const filterResultsWithSampling = async (
     console.debug(`[Sampling] Filtered to ${filteredResults.length} results.`);
     return filteredResults;
   } catch (error) {
-    console.debug("[Sampling] Fatal error during filtering:", error);
+    console.debug("[Sampling] LLM call failed:", error);
     return results.slice(0, maxResults);
   }
 };

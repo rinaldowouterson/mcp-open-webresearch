@@ -2,6 +2,7 @@ import { SearchResult } from "../../types/index.js";
 import { getEngines } from "../../engines/search/registry.js";
 import { mergeSearchResults } from "./signalProcessor.js";
 import { MergedSearchResult } from "../../types/MergedSearchResult.js";
+import { getConfig } from "../../config/index.js";
 
 /**
  * Executes search across specified engines using dynamic registry.
@@ -10,6 +11,8 @@ import { MergedSearchResult } from "../../types/MergedSearchResult.js";
  * NOTE: maxResults is applied PER ENGINE.
  * If you request 10 results and use 3 engines, you may process up to 30 raw results
  * before deduplication and merging.
+ *
+ * Respects config.deepSearch.skipCooldown - if true, ignores rate limiting.
  */
 export const executeMultiEngineSearch = async (
   query: string,
@@ -19,16 +22,19 @@ export const executeMultiEngineSearch = async (
   const cleanQuery = query.trim();
   if (!cleanQuery) throw new Error("Search query cannot be empty");
 
+  const config = getConfig();
+  const skipCooldown = config.skipCooldown;
+
   const allEngines = await getEngines();
 
-  // Filter out rate-limited engines
+  // Filter out rate-limited engines (unless skipCooldown is true)
   const availableEngines = engines.filter((name) => {
     const engine = allEngines.get(name);
     if (!engine) {
       console.debug(`Engine "${name}" not found in registry, skipping`);
       return false;
     }
-    if (engine.isRateLimited()) {
+    if (!skipCooldown && engine.isRateLimited()) {
       console.debug(`Engine "${name}" is rate-limited, skipping`);
       return false;
     }
