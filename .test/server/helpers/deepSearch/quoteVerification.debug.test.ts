@@ -489,6 +489,11 @@ More text follows.`;
     });
 
     it("REAL TEST: visitPage converts HTML to markdown - check that output", async () => {
+      // Initialize config for the test
+      const { resetConfigForTesting } =
+        await import("../../../../src/config/index.js");
+      resetConfigForTesting();
+
       // Import the actual visitPage function to see what markdown is produced
       const { visitPage } =
         await import("../../../../src/engines/visit_page/visit.js");
