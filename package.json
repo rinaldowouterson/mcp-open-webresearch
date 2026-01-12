@@ -16,11 +16,11 @@
     "inspector:timeout": "npm run build && export MCP_SERVER_REQUEST_TIMEOUT=1200000 && export MCP_REQUEST_MAX_TOTAL_TIMEOUT=1200000 && export MCP_REQUEST_TIMEOUT_RESET_ON_PROGRESS=true && npx @modelcontextprotocol/inspector node --env-file=.env build/index.js",
     "start": "node --env-file=.env build/index.js",
     "start:sampling": "node --env-file=.env build/index.js",
-    "test": "vitest run",
+    "test": "NODE_ENV=test vitest run",
     "test:docker": "docker-compose -f .test/docker/docker-compose.test.yml up --build --abort-on-container-exit",
-    "test:infrastructure": "vitest run -c vitest.infra.config.ts",
-    "test:offline": "vitest run -c vitest.offline.config.ts",
-    "test:online": "vitest run -c vitest.online.config.ts",
+    "test:infrastructure": "NODE_ENV=test vitest run -c vitest.infra.config.ts",
+    "test:offline": "NODE_ENV=test vitest run -c vitest.offline.config.ts",
+    "test:online": "NODE_ENV=test vitest run -c vitest.online.config.ts",
     "generate-certs": "npm run build && node build/scripts/generate-test-certs.js"
   },
   "dependencies": {
@@ -34,6 +34,7 @@
     "express": "^4.18.2",
     "impit": "^0.7.5",
     "jsdom": "^26.1.0",
+    "lru-cache": "^11.2.4",
     "playwright-chromium": "^1.56.0",
     "proxy-chain": "^2.7.0",
     "turndown": "^7.2.0"
