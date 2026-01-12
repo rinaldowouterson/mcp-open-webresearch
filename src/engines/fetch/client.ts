@@ -106,3 +106,15 @@ export async function smartPost(
     text: () => response.text(),
   };
 }
+
+/**
+ * Resets the lazy-initialized clients.
+ * REQUIRED: Must only be used in non-production environments (e.g., testing).
+ */
+export function resetClients(): void {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("CRITICAL: resetClients called in PRODUCTION environment!");
+  }
+  browserClient = null;
+  standardClient = null;
+}

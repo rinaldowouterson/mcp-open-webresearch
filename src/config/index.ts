@@ -1,13 +1,11 @@
-import { HttpsProxyAgent } from "https-proxy-agent";
-import { SocksProxyAgent } from "socks-proxy-agent";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   AppConfig,
   ProxyConfig,
   ProxyProtocol,
-  ProxyAgent,
   LlmConfig,
 } from "../types/index.js";
+import { resetClients } from "../engines/fetch/client.js";
 import { ConfigOverrides } from "../types/index.js";
 
 /**
@@ -64,8 +62,6 @@ const loadProxyConfig = (overrides?: ConfigOverrides): ProxyConfig => {
   let username: string | null = null;
   let password: string | null = null;
 
-  let agent: ProxyAgent | null = null;
-
   if (isValidProtocol) {
     try {
       urlObject = new URL(proxyUrl);
@@ -74,23 +70,11 @@ const loadProxyConfig = (overrides?: ConfigOverrides): ProxyConfig => {
       port = urlObject.port ? parseInt(urlObject.port, 10) : null;
       username = urlObject.username;
       password = urlObject.password;
-
-      if (protocol && protocol.includes("socks")) {
-        agent = {
-          http: new SocksProxyAgent(urlObject),
-          https: new SocksProxyAgent(urlObject),
-        };
-      } else {
-        agent = {
-          http: new HttpsProxyAgent(urlObject),
-          https: new HttpsProxyAgent(urlObject),
-        };
-      }
     } catch (caughtError) {
-      console.debug("loader: Failed to create proxy agent: ", caughtError);
+      console.debug("loader: Failed to parse proxy URL: ", caughtError);
       error = error
         ? error + `\n${caughtError};`
-        : `Failed to create proxy agent: ${caughtError}`;
+        : `Failed to parse proxy URL: ${caughtError}`;
     }
   }
 
@@ -117,9 +101,12 @@ const clientSupportsSampling = (server: McpServer): boolean => {
 };
 
 /**
- * Builds LLM configuration from environment variables and server capabilities.
+ * Core LLM configuration builder.
+ * Extracted to allow reuse in both production (setConfig) and testing (resetConfigForTesting).
+ *
+ * @param ideSupportsSampling - Whether the IDE supports sampling (from server or mocked)
  */
-const buildLlmConfig = (server: McpServer): LlmConfig => {
+const buildLlmConfigFromParams = (ideSupportsSampling: boolean): LlmConfig => {
   const baseUrl = process.env.LLM_BASE_URL || null;
   const apiKey = process.env.LLM_API_KEY || null;
   const model = process.env.LLM_NAME || null;
@@ -127,7 +114,6 @@ const buildLlmConfig = (server: McpServer): LlmConfig => {
 
   const skipIdeSampling =
     process.env.SKIP_IDE_SAMPLING?.toLowerCase() === "true";
-  const ideSupportsSampling = clientSupportsSampling(server);
   const samplingEnabled = process.env.SAMPLING?.toLowerCase() === "true";
 
   // Logic based on README.md priority table:
@@ -180,6 +166,13 @@ const buildLlmConfig = (server: McpServer): LlmConfig => {
 };
 
 /**
+ * Builds LLM configuration from environment variables and server capabilities.
+ */
+const buildLlmConfig = (server: McpServer): LlmConfig => {
+  return buildLlmConfigFromParams(clientSupportsSampling(server));
+};
+
+/**
  * Initializes application configuration. Must be called once during server startup.
  * Reads environment variables, applies overrides, and stores the frozen config singleton.
  * @returns The frozen application configuration.
@@ -192,6 +185,9 @@ export const setConfig = (
     console.debug("setConfig called multiple times. Using existing config.");
     return appConfig;
   }
+
+  // Ensure fetcher clients are reset when new config is set
+  resetClients();
 
   const defaultSearchEngines =
     overrides?.engines ||
@@ -296,29 +292,9 @@ export const resetConfigForTesting = (
       "CRITICAL: resetConfigForTesting called in PRODUCTION environment!",
     );
   }
-  const baseUrl = process.env.LLM_BASE_URL || null;
-  const apiKey = process.env.LLM_API_KEY || null;
-  const model = process.env.LLM_NAME || null;
-  const apiSamplingAvailable = !!baseUrl && !!model;
 
-  const skipIdeSampling =
-    process.env.SKIP_IDE_SAMPLING?.toLowerCase() === "true";
-  const samplingEnabled = process.env.SAMPLING?.toLowerCase() === "true";
-
-  const samplingAllowed =
-    samplingEnabled &&
-    ((ideSupportsSampling && !skipIdeSampling) || apiSamplingAvailable);
-
-  const timeoutMs = parseInt(process.env.LLM_TIMEOUT_MS || "30000", 10);
-
-  if (samplingEnabled && !ideSupportsSampling && !apiSamplingAvailable) {
-    console.debug(
-      "Sampling is enabled but IDE does not support sampling and no API sampling is available.",
-    );
-    console.debug(
-      "Sampling is disabled until a valid LLM base url and model are set.",
-    );
-  }
+  // Ensure fetcher clients are reset during tests
+  resetClients();
 
   const defaultSearchEngines =
     overrides?.engines ||
@@ -358,28 +334,7 @@ export const resetConfigForTesting = (
       writeToFile:
         !!overrides?.debugFile || process.env.WRITE_DEBUG_FILE === "true",
     },
-    llm: {
-      samplingAllowed,
-      baseUrl,
-      apiKey,
-      model,
-      timeoutMs,
-      skipIdeSampling,
-      apiSamplingAvailable,
-      ideSupportsSampling,
-      ideSelectedButApiAvailable:
-        samplingEnabled &&
-        !ideSupportsSampling &&
-        !skipIdeSampling &&
-        apiSamplingAvailable,
-      apiSelectedButIdeAvailable:
-        samplingEnabled &&
-        ideSupportsSampling &&
-        skipIdeSampling &&
-        !apiSamplingAvailable,
-      useApiFirst: skipIdeSampling && apiSamplingAvailable,
-      useIdeFirst: !skipIdeSampling && ideSupportsSampling,
-    },
+    llm: buildLlmConfigFromParams(ideSupportsSampling),
     skipCooldown: process.env.SKIP_COOLDOWN?.toLowerCase() === "true",
     deepSearch: {
       maxLoops: parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "20", 10),
