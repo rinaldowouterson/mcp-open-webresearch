@@ -13,7 +13,7 @@ Designed to be robust and compatible with various network environments, includin
 
 ## Features
 
-- **Dynamic Engine Discovery**: Engines are loaded dynamically from the `src/engines/search/` directory. Adding a new engine requires only a new folder and file, without modifying core logic.
+- **Dynamic Engine Discovery**: Engines are loaded dynamically from the `src/infrastructure/search/` directory. Adding a new engine requires only a new folder and file, without modifying core logic.
 - **Multi-Engine Search**: Aggregates results from Bing, DuckDuckGo, and Brave.
 - **Deep Research** (`search_deep`): Recursive research agent that performs multi-round searching, citation extraction, and answer synthesis.
 - **Ephemeral Downloads**: In-memory storage for Deep Search reports using a 100MB bounded LRU cache with 10-minute auto-expiration.
@@ -186,7 +186,7 @@ Antigravity / Windsurf handles long-running tools natively, but if they let you 
 
 To add a new search engine:
 
-1.  **Create Directory**: `src/engines/search/{engine_name}/`
+1.  **Create Directory**: `src/infrastructure/search/{engine_name}/`
 2.  **Implement Logic**: Create `{engine_name}.ts` with the fetching/parsing logic.
 3.  **Export Interface**: Create `index.ts` exporting the `SearchEngine` interface:
 

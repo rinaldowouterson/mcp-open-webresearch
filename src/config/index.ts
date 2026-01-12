@@ -5,7 +5,7 @@ import {
   ProxyProtocol,
   LlmConfig,
 } from "../types/index.js";
-import { resetClients } from "../engines/fetch/client.js";
+import { resetClients } from "../infrastructure/fetch/client.js";
 import { ConfigOverrides } from "../types/index.js";
 
 /**
