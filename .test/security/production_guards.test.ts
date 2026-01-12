@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { resetConfigForTesting } from "../../src/config/index.js";
-import { resetProductionCacheForTesting } from "../../src/server/helpers/ephemeralBufferCache.js";
+import { resetProductionCacheForTesting } from "../../src/infrastructure/cache/ephemeralBuffer.js";
 
 describe("Production Safety Guards", () => {
   const originalEnv = process.env.NODE_ENV;

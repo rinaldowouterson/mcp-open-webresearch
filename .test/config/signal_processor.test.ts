@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   mergeSearchResults,
   getUrlHash,
-} from "../../src/server/helpers/signalProcessor.js";
+} from "../../src/domain/search/signalProcessor.js";
 import { SearchResult } from "../../src/types/index.js";
 
 describe("Signal Processor", () => {

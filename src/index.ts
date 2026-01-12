@@ -1,23 +1,20 @@
 #!/usr/bin/env node
 import { captureConsoleDebug, closeWritingStream } from "./utils/logger.js";
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { serverInitializer, initEngineRegistry } from "./server/initializer.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import {
+  serverInitializer,
+  initEngineRegistry,
+} from "./infrastructure/bootstrap/toolRegistry.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import express from "express";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { randomUUID } from "node:crypto";
-import cors from "cors";
 import { setConfig } from "./config/index.js";
-import { cleanBrowserSession } from "./engines/visit_page/visit.js";
+import { cleanBrowserSession } from "./infrastructure/visit_page/visit.js";
 import { configureLogger } from "./utils/logger.js";
-import { mcpServer } from "./server/instance.js";
-import { getBuffer } from "./server/helpers/ephemeralBufferCache.js";
-
-import { AppConfig } from "./types/index.js";
+import { mcpServer } from "./infrastructure/bootstrap/instance.js";
+import { createApp } from "./infrastructure/bootstrap/app.js";
+import { parseCliArgs } from "./utils/cli.js";
 
 export { mcpServer };
+export { createApp };
 
 process.on("SIGTERM", async () => {
   console.debug("Received SIGTERM (VSCode closing), cleaning session...");
@@ -41,108 +38,6 @@ process.on("SIGHUP", async () => {
   await closeWritingStream();
   process.exit(0);
 });
-
-/**
- * Creates and configures the Express application with MCP transport.
- * Extracted for testability to allow verification of the server "contract".
- */
-export function createApp(server: McpServer, appConfig: AppConfig) {
-  const app = express();
-
-  app.use(express.json());
-
-  if (appConfig.enableCors) {
-    app.use(
-      cors({
-        origin: appConfig.corsOrigin || "*",
-        methods: ["GET", "POST", "DELETE"],
-      }),
-    );
-    app.options("*", cors());
-  }
-
-  const transports = {
-    streamable: {} as Record<string, StreamableHTTPServerTransport>,
-  };
-
-  app.post("/mcp", async (req, res) => {
-    const sessionId = req.headers["mcp-session-id"] as string | undefined;
-    let transport: StreamableHTTPServerTransport;
-
-    if (sessionId && transports.streamable[sessionId]) {
-      transport = transports.streamable[sessionId];
-    } else if (!sessionId && isInitializeRequest(req.body)) {
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (sessionId) => {
-          transports.streamable[sessionId] = transport;
-        },
-        enableDnsRebindingProtection:
-          appConfig.security.enableDnsRebindingProtection,
-        allowedHosts: appConfig.security.allowedHosts,
-      });
-
-      transport.onclose = () => {
-        if (transport.sessionId) {
-          delete transports.streamable[transport.sessionId];
-        }
-      };
-
-      await server.connect(transport);
-    } else {
-      res.status(400).json({
-        jsonrpc: "2.0",
-        error: {
-          code: -32000,
-          message: "Bad Request: No valid session ID provided",
-        },
-        id: null,
-      });
-      return;
-    }
-
-    await transport.handleRequest(req, res, req.body);
-  });
-
-  const handleSessionRequest = async (
-    req: express.Request,
-    res: express.Response,
-  ) => {
-    const sessionId = req.headers["mcp-session-id"] as string | undefined;
-    if (!sessionId || !transports.streamable[sessionId]) {
-      res.status(400).send("Invalid or missing session ID");
-      return;
-    }
-
-    const transport = transports.streamable[sessionId];
-    await transport.handleRequest(req, res);
-  };
-
-  app.get("/mcp", handleSessionRequest);
-
-  app.delete("/mcp", handleSessionRequest);
-
-  app.get("/download/:id", (req, res) => {
-    const id = req.params.id;
-    const buffer = getBuffer(id);
-
-    if (!buffer) {
-      res.status(404).send("Download expired or not found");
-      return;
-    }
-
-    res.setHeader("Content-Type", "text/markdown");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="deep-search-result-${id}.md"`,
-    );
-    res.send(buffer);
-  });
-
-  return app;
-}
-
-import { parseCliArgs } from "./utils/cli.js";
 
 async function main() {
   // 1. Phase 1 (Data): Parse CLI args into a simple overrides object.

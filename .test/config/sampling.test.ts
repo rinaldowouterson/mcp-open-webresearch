@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getSampling } from "../../src/server/helpers/getSampling.js";
+import { getSampling } from "../../src/infrastructure/config/getSampling.js";
 import { getConfig, resetConfigForTesting } from "../../src/config/index.js";
 
 // Mock fs to prevent file operations during tests
@@ -164,8 +164,7 @@ describe("filterResultsWithSampling", () => {
     const { resetConfigForTesting: resetConfig } =
       await import("../../src/config/index.js");
     resetConfig();
-    const module =
-      await import("../../src/server/helpers/filterResultsWithSampling.js");
+    const module = await import("../../src/domain/search/filters.js");
     expect(module.filterResultsWithSampling).toBeDefined();
     // clientSupportsSampling was moved to config/index.ts
   });
@@ -180,7 +179,7 @@ describe("filterResultsWithSampling", () => {
     resetConfig(true); // IDE supports sampling
 
     const { filterResultsWithSampling } =
-      await import("../../src/server/helpers/filterResultsWithSampling.js");
+      await import("../../src/domain/search/filters.js");
 
     const consoleDebugSpy = vi.spyOn(console, "debug");
 
@@ -250,7 +249,7 @@ describe("filterResultsWithSampling", () => {
     resetConfig(false);
 
     const { filterResultsWithSampling } =
-      await import("../../src/server/helpers/filterResultsWithSampling.js");
+      await import("../../src/domain/search/filters.js");
 
     const consoleDebugSpy = vi.spyOn(console, "debug");
 
@@ -295,7 +294,7 @@ describe("filterResultsWithSampling", () => {
     resetConfig(true);
 
     const { filterResultsWithSampling } =
-      await import("../../src/server/helpers/filterResultsWithSampling.js");
+      await import("../../src/domain/search/filters.js");
 
     const mockResults = [
       {
@@ -334,7 +333,8 @@ describe("filterResultsWithSampling", () => {
 
 describe("updateSampling", () => {
   it("should import updateSampling without error", async () => {
-    const module = await import("../../src/server/helpers/updateSampling.js");
+    const module =
+      await import("../../src/infrastructure/config/updateSampling.js");
     expect(module.updateSampling).toBeDefined();
   });
 });
@@ -342,7 +342,7 @@ describe("updateSampling", () => {
 describe("Prompt Template", () => {
   it("should build sampling prompt correctly", async () => {
     const { buildSamplingPrompt } =
-      await import("../../src/prompts/samplingPrompt.js");
+      await import("../../src/domain/search/prompts/samplingPrompt.js");
 
     const prompt = buildSamplingPrompt(
       "test query",
@@ -391,7 +391,7 @@ describe("Direct API Sampling (External LLM)", () => {
         ),
     });
 
-    vi.doMock("../../src/engines/fetch/client.js", () => ({
+    vi.doMock("../../src/infrastructure/fetch/client.js", () => ({
       smartPost: mockSmartPost,
       resetClients: vi.fn(),
     }));
@@ -402,7 +402,7 @@ describe("Direct API Sampling (External LLM)", () => {
     resetConfig();
 
     const { filterResultsWithSampling } =
-      await import("../../src/server/helpers/filterResultsWithSampling.js");
+      await import("../../src/domain/search/filters.js");
 
     const consoleDebugSpy = vi.spyOn(console, "debug");
 
@@ -480,7 +480,7 @@ describe("Direct API Sampling (External LLM)", () => {
         ),
     });
 
-    vi.doMock("../../src/engines/fetch/client.js", () => ({
+    vi.doMock("../../src/infrastructure/fetch/client.js", () => ({
       smartPost: mockSmartPost,
       resetClients: vi.fn(),
     }));
@@ -491,7 +491,7 @@ describe("Direct API Sampling (External LLM)", () => {
     resetConfig();
 
     const { filterResultsWithSampling } =
-      await import("../../src/server/helpers/filterResultsWithSampling.js");
+      await import("../../src/domain/search/filters.js");
 
     const mockResults = [
       {
@@ -532,7 +532,7 @@ describe("Direct API Sampling (External LLM)", () => {
   it("should fallback to IDE when SKIP_IDE_SAMPLING=true but direct API fails and IDE is available", async () => {
     const mockSmartPost = vi.fn().mockRejectedValue(new Error("Network error"));
 
-    vi.doMock("../../src/engines/fetch/client.js", () => ({
+    vi.doMock("../../src/infrastructure/fetch/client.js", () => ({
       smartPost: mockSmartPost,
       resetClients: vi.fn(),
     }));
@@ -543,7 +543,7 @@ describe("Direct API Sampling (External LLM)", () => {
     resetConfig(true); // IDE supports sampling for fallback
 
     const { filterResultsWithSampling } =
-      await import("../../src/server/helpers/filterResultsWithSampling.js");
+      await import("../../src/domain/search/filters.js");
 
     const consoleDebugSpy = vi.spyOn(console, "debug");
 
@@ -600,7 +600,7 @@ describe("Direct API Sampling (External LLM)", () => {
     resetConfig(true); // IDE supports sampling
 
     const { filterResultsWithSampling } =
-      await import("../../src/server/helpers/filterResultsWithSampling.js");
+      await import("../../src/domain/search/filters.js");
 
     const consoleDebugSpy = vi.spyOn(console, "debug");
 
