@@ -252,6 +252,7 @@ export function registerDeepSearchTool(
         cacheBuffer(downloadId, Buffer.from(finalOutput, "utf-8"));
 
         const downloadUrl = `${getConfig().publicUrl}/download/${downloadId}`;
+        console.debug(`Download URL: ${downloadUrl}`);
         finalOutput = `Download URL: ${downloadUrl}\n\n${finalOutput}`;
 
         return createResponse(finalOutput);
