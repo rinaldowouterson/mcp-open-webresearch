@@ -79,11 +79,23 @@ describe("createLaunchOptionsForPlayWright", () => {
         skipIdeSampling: false,
         apiSamplingAvailable: false,
         ideSupportsSampling: false,
+        ideSelectedButApiAvailable: false,
+        apiSelectedButIdeAvailable: false,
+        useApiFirst: false,
+        useIdeFirst: false,
       },
       deepSearch: {
         maxLoops: 3,
         resultsPerEngine: 3,
         saturationThreshold: 0.6,
+        maxCitationUrls: 10,
+        reportRetentionMinutes: 60,
+      },
+      publicUrl: "http://localhost:3000",
+      skipCooldown: false,
+      security: {
+        allowedHosts: ["*"],
+        enableDnsRebindingProtection: false,
       },
     };
   };
@@ -112,14 +124,8 @@ describe("createLaunchOptionsForPlayWright", () => {
     const debugCalls = consoleDebugSpy.mock.calls.map((call) => call[0]);
 
     // Check if the debug calls contain the expected messages
-    expect(debugCalls).toContain("visit: config.proxy.enabled: false");
-    expect(
-      debugCalls.some(
-        (call) =>
-          typeof call === "string" &&
-          call.includes("visit: config.proxy.enabled:"),
-      ),
-    ).toBe(true);
+    expect(debugCalls).toContain("BrowserManager: config.proxy.enabled: false");
+    expect(debugCalls).toContain("BrowserManager: config.proxy.isValid: false");
   });
 
   it("returns default launch options when proxy is enabled but not valid", () => {

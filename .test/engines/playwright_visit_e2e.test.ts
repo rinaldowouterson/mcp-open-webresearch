@@ -36,6 +36,10 @@ vi.mock("../../src/config/index.js", () => ({
     ssl: {
       ignoreTlsErrors: false,
     },
+    browser: {
+      idleTimeout: 300000,
+      concurrency: 4,
+    },
   }),
 }));
 
@@ -232,6 +236,7 @@ describe("visitPage", { timeout: 30000 }, () => {
   });
 
   afterAll(async () => {
+    await cleanBrowserSession();
     server.close();
   });
 
