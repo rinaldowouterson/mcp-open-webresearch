@@ -168,27 +168,17 @@ const buildLlmConfigFromParams = (ideSupportsSampling: boolean): LlmConfig => {
 /**
  * Builds LLM configuration from environment variables and server capabilities.
  */
-const buildLlmConfig = (server: McpServer): LlmConfig => {
-  return buildLlmConfigFromParams(clientSupportsSampling(server));
-};
-
 /**
- * Initializes application configuration. Must be called once during server startup.
- * Reads environment variables, applies overrides, and stores the frozen config singleton.
- * @returns The frozen application configuration.
+ * Builds the application configuration object.
+ * Encapsulates logic for parsing environment variables and applying overrides.
+ *
+ * @param ideSupportsSampling - Whether the IDE handles sampling (determined by server capabilities or test mock)
+ * @param overrides - Optional configuration overrides
  */
-export const setConfig = (
-  server: McpServer,
+const buildConfig = (
+  ideSupportsSampling: boolean,
   overrides?: ConfigOverrides,
-): Readonly<AppConfig> => {
-  if (appConfig) {
-    console.debug("setConfig called multiple times. Using existing config.");
-    return appConfig;
-  }
-
-  // Ensure fetcher clients are reset when new config is set
-  resetClients();
-
+): AppConfig => {
   const defaultSearchEngines =
     overrides?.engines ||
     (process.env.DEFAULT_SEARCH_ENGINES
@@ -200,15 +190,9 @@ export const setConfig = (
   const isDocker = process.env.DOCKER_ENVIRONMENT === "true";
   const chromiumPath = process.env.CHROMIUM_EXECUTABLE_PATH;
 
-  // Logging
-  const logPath = process.env.MCP_LOG_PATH || "mcp-debug.log"; // Default filename
-  // The absolute path resolution happens in logger if needed, or here.
-  // We'll pass the raw string and let logger resolve it or resolve it here if we want strictness.
-  // Best to resolve it in logger or keep it as is, but we must be consistent.
-  // The existing logger used: process.env.MCP_LOG_PATH || path.resolve(process.cwd(), "mcp-debug.log")
-  // We will replicate that logic there or pass it in. Let's pass the raw value from env/override.
+  const logPath = process.env.MCP_LOG_PATH || "mcp-debug.log";
 
-  const config: AppConfig = {
+  return {
     port:
       overrides?.port ||
       (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000),
@@ -231,34 +215,54 @@ export const setConfig = (
       chromiumPath,
     },
     logging: {
-      level: "debug", // Fixed for now as we only have debug
+      level: "debug",
       path: logPath,
       writeToTerminal:
         overrides?.debug ?? process.env.WRITE_DEBUG_TERMINAL === "true",
       writeToFile:
         !!overrides?.debugFile || process.env.WRITE_DEBUG_FILE === "true",
     },
-    llm: buildLlmConfig(server),
+    llm: buildLlmConfigFromParams(ideSupportsSampling),
     skipCooldown: process.env.SKIP_COOLDOWN?.toLowerCase() === "true",
     deepSearch: {
-      maxLoops: parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "20", 10),
-      resultsPerEngine: parseInt(
-        process.env.DEEP_SEARCH_RESULTS_PER_ENGINE || "5",
-        10,
-      ),
-      saturationThreshold: parseFloat(
-        process.env.DEEP_SEARCH_SATURATION_THRESHOLD || "0.6",
-      ),
-      maxCitationUrls: parseInt(
-        process.env.DEEP_SEARCH_MAX_CITATION_URLS || "10",
-        10,
-      ),
-      reportRetentionMinutes: parseInt(
-        process.env.DEEP_SEARCH_REPORT_RETENTION_MINUTES || "10",
-        10,
-      ),
+      maxLoops:
+        overrides?.deepSearch?.maxLoops ??
+        parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "20", 10),
+      resultsPerEngine:
+        overrides?.deepSearch?.resultsPerEngine ??
+        parseInt(process.env.DEEP_SEARCH_RESULTS_PER_ENGINE || "5", 10),
+      saturationThreshold:
+        overrides?.deepSearch?.saturationThreshold ??
+        parseFloat(process.env.DEEP_SEARCH_SATURATION_THRESHOLD || "0.6"),
+      maxCitationUrls:
+        overrides?.deepSearch?.maxCitationUrls ??
+        parseInt(process.env.DEEP_SEARCH_MAX_CITATION_URLS || "10", 10),
+      reportRetentionMinutes:
+        overrides?.deepSearch?.reportRetentionMinutes ??
+        parseInt(process.env.DEEP_SEARCH_REPORT_RETENTION_MINUTES || "10", 10),
     },
   };
+};
+
+/**
+ * Initializes application configuration. Must be called once during server startup.
+ * Reads environment variables, applies overrides, and stores the frozen config singleton.
+ * @returns The frozen application configuration.
+ */
+export const setConfig = (
+  server: McpServer,
+  overrides?: ConfigOverrides,
+): Readonly<AppConfig> => {
+  if (appConfig) {
+    console.debug("setConfig called multiple times. Using existing config.");
+    return appConfig;
+  }
+
+  // Ensure fetcher clients are reset when new config is set
+  resetClients();
+
+  const ideSupportsSampling = clientSupportsSampling(server);
+  const config = buildConfig(ideSupportsSampling, overrides);
 
   appConfig = Object.freeze(config);
   return appConfig;
@@ -296,65 +300,12 @@ export const resetConfigForTesting = (
   // Ensure fetcher clients are reset during tests
   resetClients();
 
-  const defaultSearchEngines =
-    overrides?.engines ||
-    (process.env.DEFAULT_SEARCH_ENGINES
-      ? process.env.DEFAULT_SEARCH_ENGINES.split(",").map((e) => e.trim())
-      : ["bing", "duckduckgo", "brave"]);
-
-  const enableCors = overrides?.cors ?? process.env.ENABLE_CORS === "true";
-
-  appConfig = Object.freeze({
-    port:
-      overrides?.port ||
-      (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000),
-    publicUrl:
-      overrides?.publicUrl ||
-      process.env.PUBLIC_URL ||
-      `http://localhost:${
-        overrides?.port ||
-        (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000)
-      }`,
-    defaultSearchEngines,
-    proxy: loadProxyConfig(overrides),
-    enableCors,
-    corsOrigin: process.env.CORS_ORIGIN || "*",
-    ssl: {
-      ignoreTlsErrors: process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0",
-    },
-    docker: {
-      isDocker: process.env.DOCKER_ENVIRONMENT === "true",
-      chromiumPath: process.env.CHROMIUM_EXECUTABLE_PATH,
-    },
-    logging: {
-      level: "debug",
-      path: process.env.MCP_LOG_PATH || "mcp-debug.log",
-      writeToTerminal:
-        overrides?.debug ?? process.env.WRITE_DEBUG_TERMINAL === "true",
-      writeToFile:
-        !!overrides?.debugFile || process.env.WRITE_DEBUG_FILE === "true",
-    },
-    llm: buildLlmConfigFromParams(ideSupportsSampling),
-    skipCooldown: process.env.SKIP_COOLDOWN?.toLowerCase() === "true",
-    deepSearch: {
-      maxLoops: parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "20", 10),
-      resultsPerEngine: parseInt(
-        process.env.DEEP_SEARCH_RESULTS_PER_ENGINE || "3",
-        10,
-      ),
-      saturationThreshold: parseFloat(
-        process.env.DEEP_SEARCH_SATURATION_THRESHOLD || "0.6",
-      ),
-      maxCitationUrls: parseInt(
-        process.env.DEEP_SEARCH_MAX_CITATION_URLS || "10",
-        10,
-      ),
-      reportRetentionMinutes: parseInt(
-        process.env.DEEP_SEARCH_REPORT_RETENTION_MINUTES || "10",
-        10,
-      ),
-    },
-  });
+  // In testing, we use the hardcoded "3" result limit from the original code if not overridden?
+  // Actually, for consistency, we now rely on buildConfig which uses 5.
+  // Tests that rely on specific counts should mock the env var.
+  // However, to strictly preserve behavior if needed, we could set env var if not set.
+  // But let's proceed with unified config.
+  appConfig = Object.freeze(buildConfig(ideSupportsSampling, overrides));
 };
 
 /**

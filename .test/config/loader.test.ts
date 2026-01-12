@@ -252,4 +252,30 @@ describe("Config Loader", () => {
       expect(config.llm.timeoutMs).toBe(30000);
     });
   });
+
+  describe("Deep Search Config", () => {
+    it("should allow overriding deep search parameters", () => {
+      const overrides: ConfigOverrides = {
+        deepSearch: {
+          maxLoops: 50,
+          resultsPerEngine: 10,
+        },
+      };
+
+      resetConfigForTesting(false, overrides);
+      const config = getConfig();
+
+      expect(config.deepSearch.maxLoops).toBe(50);
+      expect(config.deepSearch.resultsPerEngine).toBe(10);
+      // specific overrides shouldn't affect other defaults
+      expect(config.deepSearch.saturationThreshold).toBe(0.6);
+    });
+
+    it("should fallback to env vars if no override provided", () => {
+      process.env.DEEP_SEARCH_MAX_LOOPS = "25";
+      resetConfigForTesting(false);
+      const config = getConfig();
+      expect(config.deepSearch.maxLoops).toBe(25);
+    });
+  });
 });
