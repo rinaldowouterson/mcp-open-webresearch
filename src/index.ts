@@ -15,6 +15,7 @@ import { type ConfigOverrides } from "./types/ConfigOverrides.js";
 import { cleanBrowserSession } from "./engines/visit_page/visit.js";
 import { configureLogger } from "./utils/logger.js";
 import { mcpServer } from "./server/instance.js";
+import { getBuffer } from "./server/helpers/ephemeralBufferCache.js";
 
 export { mcpServer };
 
@@ -81,10 +82,10 @@ async function main() {
   // Initialize engine registry before registering tools
   await initEngineRegistry();
 
-  serverInitializer(mcpServer);
-
   // Initialize config with server capabilities and overrides (one-time setup)
   const appConfig = setConfig(mcpServer, overrides);
+
+  serverInitializer(mcpServer);
 
   // Configure logger based on the loaded configuration
   // This is the CRITICAL STEP ensuring logger is ready before any heavy lifting
@@ -163,6 +164,25 @@ async function main() {
   app.get("/mcp", handleSessionRequest);
 
   app.delete("/mcp", handleSessionRequest);
+
+  app.delete("/mcp", handleSessionRequest);
+
+  app.get("/download/:id", (req, res) => {
+    const id = req.params.id;
+    const buffer = getBuffer(id);
+
+    if (!buffer) {
+      res.status(404).send("Download expired or not found");
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/markdown");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="deep-search-result-${id}.md"`,
+    );
+    res.send(buffer);
+  });
 
   const PORT = appConfig.port;
   const transport = new StdioServerTransport();

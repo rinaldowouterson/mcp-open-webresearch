@@ -216,6 +216,13 @@ export const setConfig = (
     port:
       overrides?.port ||
       (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000),
+    publicUrl:
+      overrides?.publicUrl ||
+      process.env.PUBLIC_URL ||
+      `http://localhost:${
+        overrides?.port ||
+        (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000)
+      }`,
     defaultSearchEngines,
     proxy: loadProxyConfig(overrides),
     enableCors,
@@ -238,9 +245,9 @@ export const setConfig = (
     llm: buildLlmConfig(server),
     skipCooldown: process.env.SKIP_COOLDOWN?.toLowerCase() === "true",
     deepSearch: {
-      maxLoops: parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "3", 10),
+      maxLoops: parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "20", 10),
       resultsPerEngine: parseInt(
-        process.env.DEEP_SEARCH_RESULTS_PER_ENGINE || "3",
+        process.env.DEEP_SEARCH_RESULTS_PER_ENGINE || "5",
         10,
       ),
       saturationThreshold: parseFloat(
@@ -248,6 +255,10 @@ export const setConfig = (
       ),
       maxCitationUrls: parseInt(
         process.env.DEEP_SEARCH_MAX_CITATION_URLS || "10",
+        10,
+      ),
+      reportRetentionMinutes: parseInt(
+        process.env.DEEP_SEARCH_REPORT_RETENTION_MINUTES || "10",
         10,
       ),
     },
@@ -280,6 +291,11 @@ export const resetConfigForTesting = (
   ideSupportsSampling = false,
   overrides?: ConfigOverrides,
 ): void => {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "CRITICAL: resetConfigForTesting called in PRODUCTION environment!",
+    );
+  }
   const baseUrl = process.env.LLM_BASE_URL || null;
   const apiKey = process.env.LLM_API_KEY || null;
   const model = process.env.LLM_NAME || null;
@@ -316,6 +332,13 @@ export const resetConfigForTesting = (
     port:
       overrides?.port ||
       (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000),
+    publicUrl:
+      overrides?.publicUrl ||
+      process.env.PUBLIC_URL ||
+      `http://localhost:${
+        overrides?.port ||
+        (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000)
+      }`,
     defaultSearchEngines,
     proxy: loadProxyConfig(overrides),
     enableCors,
@@ -359,7 +382,7 @@ export const resetConfigForTesting = (
     },
     skipCooldown: process.env.SKIP_COOLDOWN?.toLowerCase() === "true",
     deepSearch: {
-      maxLoops: parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "3", 10),
+      maxLoops: parseInt(process.env.DEEP_SEARCH_MAX_LOOPS || "20", 10),
       resultsPerEngine: parseInt(
         process.env.DEEP_SEARCH_RESULTS_PER_ENGINE || "3",
         10,
@@ -369,6 +392,10 @@ export const resetConfigForTesting = (
       ),
       maxCitationUrls: parseInt(
         process.env.DEEP_SEARCH_MAX_CITATION_URLS || "10",
+        10,
+      ),
+      reportRetentionMinutes: parseInt(
+        process.env.DEEP_SEARCH_REPORT_RETENTION_MINUTES || "10",
         10,
       ),
     },

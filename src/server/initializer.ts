@@ -24,6 +24,8 @@ import { executeResultCollector } from "./helpers/deepSearch/agents/resultCollec
 import { executeCitationExtractor } from "./helpers/deepSearch/agents/citationExtractor.js";
 import { executeRefiner } from "./helpers/deepSearch/agents/refiner.js";
 import { executeAnswerSynthesizer } from "./helpers/deepSearch/agents/answerSynthesizer.js";
+import { generateDownloadId } from "./helpers/generateDownloadId.js";
+import { cacheBuffer } from "./helpers/ephemeralBufferCache.js";
 
 // Cache for available engine names (populated at startup)
 let availableEngines: string[] = [];
@@ -287,16 +289,25 @@ export const serverInitializer = (mcpServer: McpServer): void => {
           .number()
           .min(1)
           .max(50)
-          .default(20)
-          .optional()
-          .describe("Maximum research iterations (default: 20)"),
+          .default(getConfig().deepSearch.maxLoops)
+
+          .describe(
+            `Maximum research iterations (recommended and default value: ${getConfig().deepSearch.maxLoops})`,
+          ),
         results_per_engine: z
           .number()
           .min(1)
           .max(20)
-          .default(10)
-          .optional()
+          .default(getConfig().deepSearch.resultsPerEngine)
           .describe("Search results per engine (default: 10)"),
+        max_citation_urls: z
+          .number()
+          .min(-1)
+          .max(50)
+          .default(getConfig().deepSearch.maxCitationUrls)
+          .describe(
+            `Maximum citations to extract (default: ${getConfig().deepSearch.maxCitationUrls}, -1 for no limit)`,
+          ),
         engines: z
           .array(z.string())
           .optional()
@@ -312,18 +323,23 @@ export const serverInitializer = (mcpServer: McpServer): void => {
           ),
       },
     },
-    async ({ objective, attach_context }, extra) => {
+    async (
+      {
+        objective,
+        attach_context,
+        max_loops,
+        results_per_engine,
+        max_citation_urls,
+      },
+      extra,
+    ) => {
       try {
         const signal = extra?.signal;
 
         // Phase 3: Create ContextSheet, run QueryGenerator
         const config = getConfig();
         const sessionId = `ds-${Date.now()}`;
-        const sheet = createContextSheet(
-          sessionId,
-          objective,
-          config.deepSearch.maxLoops,
-        );
+        const sheet = createContextSheet(sessionId, objective, max_loops);
 
         // Start Round 1
         startNewRound(sheet);
@@ -371,7 +387,7 @@ export const serverInitializer = (mcpServer: McpServer): void => {
           // Run ResultCollector
           const searchResults = await executeResultCollector(
             currentRound.queries,
-            undefined,
+            { resultsPerEngine: results_per_engine },
             signal,
           );
 
@@ -384,7 +400,7 @@ export const serverInitializer = (mcpServer: McpServer): void => {
           const citationResult = await executeCitationExtractor(
             searchResults.results,
             objective,
-            config.deepSearch.maxCitationUrls,
+            max_citation_urls,
             existingCitations,
             startingId,
             signal,
@@ -458,6 +474,7 @@ export const serverInitializer = (mcpServer: McpServer): void => {
         );
 
         // Final Output Construction
+        const downloadId = generateDownloadId();
         let finalOutput = `# Deep Search Result\n\n${synthesis.formattedOutput}`;
 
         // Optionally attach ContextSheet for debugging/transparency
@@ -465,6 +482,12 @@ export const serverInitializer = (mcpServer: McpServer): void => {
           finalOutput += `\n\n\n------\n\n`;
           finalOutput += renderContextSheet(sheet);
         }
+
+        // Cache the result (Phase 1: Factory Manager - Main Thread storage)
+        cacheBuffer(downloadId, Buffer.from(finalOutput, "utf-8"));
+
+        const downloadUrl = `${getConfig().publicUrl}/download/${downloadId}`;
+        finalOutput = `Download URL: ${downloadUrl}\n\n${finalOutput}`;
 
         return createResponse(finalOutput);
       } catch (error) {

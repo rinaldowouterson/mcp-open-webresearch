@@ -58,11 +58,16 @@ export interface DeepSearchConfig {
   saturationThreshold: number;
   /** Max URLs to visit for citation extraction (-1 = no limit) */
   maxCitationUrls: number;
+  /** Report retention time in minutes (default: 10) */
+  reportRetentionMinutes: number;
 }
 
 export interface AppConfig {
   // Server port
   port: number;
+
+  // Public URL for download links (e.g. http://localhost:3000 or https://my-server.com)
+  publicUrl: string;
 
   // Search engine configuration (array of engine names to use by default)
   defaultSearchEngines: string[];
