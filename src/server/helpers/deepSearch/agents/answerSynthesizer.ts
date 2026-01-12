@@ -17,6 +17,7 @@ export interface ReferenceEntry {
   id: number;
   title: string;
   url: string;
+  quality?: string;
 }
 
 export interface SynthesizedAnswer {
@@ -28,6 +29,51 @@ export interface SynthesizedAnswer {
   confidence: number;
   /** Formatted output with answer + references section */
   formattedOutput: string;
+}
+
+/**
+ * Deterministically calculates confidence based on reference quality.
+ * Range: 0 to 100.
+ */
+function calculateConfidence(
+  sheetStatus: string,
+  usedReferences: ReferenceEntry[],
+): number {
+  // 1. Sanity Check
+  if (!usedReferences || usedReferences.length === 0) return 0;
+
+  let score = 100;
+
+  // 2. Status Penalty
+  if (sheetStatus !== "COMPLETED") {
+    score -= 20;
+  }
+
+  // 3. Quantity Penalty
+  if (usedReferences.length === 1) score -= 20;
+
+  // 4. Quality Penalties
+  for (const ref of usedReferences) {
+    switch (ref.quality?.toUpperCase()) {
+      case "HIGH":
+        score -= 0;
+        break;
+      case "MEDIUM":
+        score -= 5;
+        break;
+      case "LOW":
+        score -= 10;
+        break;
+      case "REJECTED":
+        score -= 50;
+        break;
+      default:
+        score -= 10; // Penalize unknown quality same as LOW
+    }
+  }
+
+  // 5. Clamp logic (Never below 0, never above 100)
+  return Math.max(0, Math.min(100, score));
 }
 
 /**
@@ -80,6 +126,7 @@ function generateReferences(
       id: c.id,
       title: c.title,
       url: c.url,
+      quality: c.quality,
     };
 
     if (usedIds.has(c.id)) {
@@ -164,10 +211,12 @@ export async function executeAnswerSynthesizer(
     // 2. Generate verifiable references
     const allCitations = getAllCitations(sheet);
     const { used, unused } = generateReferences(answer, allCitations);
-    const confidence = 85; // Default high confidence for verified output
+
+    // 3. Calculate confidence deterministically
+    const confidence = calculateConfidence(sheet.status, used);
 
     console.debug(
-      `[AnswerSynthesizer] Generated ${used.length} used and ${unused.length} unused references`,
+      `[AnswerSynthesizer] Generated ${used.length} used and ${unused.length} unused references. Confidence: ${confidence}%`,
     );
 
     const formattedOutput = formatOutput(answer, used, unused, confidence);
