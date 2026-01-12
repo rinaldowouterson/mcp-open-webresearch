@@ -165,8 +165,6 @@ async function main() {
 
   app.delete("/mcp", handleSessionRequest);
 
-  app.delete("/mcp", handleSessionRequest);
-
   app.get("/download/:id", (req, res) => {
     const id = req.params.id;
     const buffer = getBuffer(id);
