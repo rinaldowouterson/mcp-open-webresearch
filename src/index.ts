@@ -9,9 +9,7 @@ import express from "express";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
 import cors from "cors";
-import { program } from "commander";
 import { setConfig } from "./config/index.js";
-import { type ConfigOverrides } from "./types/ConfigOverrides.js";
 import { cleanBrowserSession } from "./engines/visit_page/visit.js";
 import { configureLogger } from "./utils/logger.js";
 import { mcpServer } from "./server/instance.js";
@@ -144,57 +142,34 @@ export function createApp(server: McpServer, appConfig: AppConfig) {
   return app;
 }
 
+import { parseCliArgs } from "./utils/cli.js";
+
 async function main() {
-  program
-    .option("-p, --port <number>", "Port to listen on")
-    .option("-d, --debug", "Enable debug logging to stdout")
-    .option("--debug-file", "Enable debug logging to file")
-    .option("--cors", "Enable CORS")
-    .option("--proxy <url>", "Proxy URL")
-    .option(
-      "--engines <items>",
-      "Comma-separated list of search engines",
-      (value) => value.split(","),
-    )
-    .option("--sampling", "Enable sampling for search results (default)")
-    .option("--no-sampling", "Disable sampling for search results")
-    .parse();
+  // 1. Phase 1 (Data): Parse CLI args into a simple overrides object.
+  // No logging should happen before this point.
+  const overrides = parseCliArgs();
 
-  const options = program.opts();
+  // 2. Phase 2 (Consolidation): Call setConfig.
+  // This is the single point where priority (CLI > Env > Default) is resolved.
+  const appConfig = setConfig(mcpServer, overrides);
 
-  const overrides: ConfigOverrides = {
-    port: options.port ? parseInt(options.port, 10) : undefined,
-    debug: options.debug,
-    debugFile: options.debugFile,
-    cors: options.cors,
-    proxyUrl: options.proxy,
-    engines: options.engines,
-    sampling: options.sampling,
-  };
-
-  configureLogger({
-    writeToTerminal: overrides.debug,
-    writeToFile: overrides.debugFile,
-  });
+  // 3. Phase 3 (Initialization): Configure logger ONCE.
+  // Now we have the final logging configuration.
+  configureLogger(appConfig.logging);
 
   await captureConsoleDebug();
 
-  // Initialize engine registry before registering tools
+  // 4. Phase 4 (Execution): Initialize registry and server.
+  // Initialize engine registry types/searchers
   await initEngineRegistry();
 
-  // Initialize config with server capabilities and overrides (one-time setup)
-  const appConfig = setConfig(mcpServer, overrides);
-
   serverInitializer(mcpServer);
-
-  // Configure logger based on the loaded configuration
-  // This is the CRITICAL STEP ensuring logger is ready before any heavy lifting
-  configureLogger(appConfig.logging);
 
   const app = createApp(mcpServer, appConfig);
 
   const PORT = appConfig.port;
   const transport = new StdioServerTransport();
+
   await mcpServer
     .connect(transport)
     .then(() => {
@@ -208,6 +183,8 @@ async function main() {
 }
 
 main().catch((error) => {
+  // Ensure we attempt to log to the configured destination if possible,
+  // otherwise fallback to stderr
   console.error("Fatal error:", error);
   process.exit(1);
 });
