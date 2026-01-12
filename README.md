@@ -15,10 +15,12 @@ Designed to be robust and compatible with various network environments, includin
 
 - **Dynamic Engine Discovery**: Engines are loaded dynamically from the `src/engines/search/` directory. Adding a new engine requires only a new folder and file, without modifying core logic.
 - **Multi-Engine Search**: Aggregates results from Bing, DuckDuckGo, and Brave.
-- **Centralized Throttling**: functionality to manage rate limits (search and pagination cooldowns) across different engines.
-- **Smart Fetch**: Configurable fetching utility (`impit`) with two modes:
-  - **Browser Mode**: Emulates a modern browser (User-Agent, Client Hints, Headers) for compatibility with sites requiring browser-like requests.
-  - **Standard Mode**: Uses a minimal HTTP client profile (no custom User-Agent) for environments where browser masquerading is not desired.
+- **Deep Research** (`search_deep`): Recursive research agent that performs multi-round searching, citation extraction, and answer synthesis.
+- **Ephemeral Downloads**: In-memory storage for Deep Search reports using a 100MB bounded LRU cache with 10-minute auto-expiration.
+- **Centralized Throttling**: Rate limit management (search and pagination cooldowns) across prioritized engines.
+- **Smart Fetch**: Configurable fetching utility (`impit`) with two operational profiles:
+  - **Browser Mode**: Includes modern browser headers (User-Agent, Client Hints) for compatibility with sites requiring browser-standard requests.
+  - **Standard Mode**: Uses a minimal HTTP client profile for environments where browser-like identification is not required.
 - **Result Sampling**: Optional LLM-based filtering to assess result relevance.
 - **Content Extraction**: Webpage visiting and markdown extraction tool (`visit_webpage`) using a headless browser.
 - **Proxy Support**: Full support for SOCKS5, HTTPS, and HTTP proxies.
@@ -281,24 +283,30 @@ npm run test:infrastructure
 
 Configuration is managed via Environment Variables or CLI arguments.
 
-| Variable                 | Default                 | Description                          |
-| :----------------------- | :---------------------- | :----------------------------------- |
-| `PORT`                   | `3000`                  | Server port.                         |
-| `ENABLE_CORS`            | `false`                 | Enable CORS.                         |
-| `CORS_ORIGIN`            | `*`                     | Allowed CORS origin.                 |
-| `DEFAULT_SEARCH_ENGINES` | `bing,duckduckgo,brave` | Default engines list.                |
-| `ENABLE_PROXY`           | `false`                 | Enable proxy support.                |
-| `HTTP_PROXY`             | -                       | HTTP Proxy URL.                      |
-| `HTTPS_PROXY`            | -                       | HTTPS Proxy URL.                     |
-| `SOCKS5_PROXY`           | -                       | SOCKS5 Proxy URL (Highest Priority). |
-| `SAMPLING`               | `false`                 | Enable result sampling.              |
-| `SKIP_IDE_SAMPLING`      | `false`                 | Prefer external API over IDE.        |
-| `LLM_BASE_URL`           | -                       | External LLM API base URL.           |
-| `LLM_API_KEY`            | -                       | External LLM API key.                |
-| `LLM_NAME`               | -                       | External LLM model name.             |
-| `LLM_TIMEOUT_MS`         | `30000`                 | Timeout for external LLM calls.      |
-| `WRITE_DEBUG_TERMINAL`   | `false`                 | Log debug output to stdout.          |
-| `WRITE_DEBUG_FILE`       | `false`                 | Log debug output to file.            |
+| Variable                               | Default                 | Description                          |
+| :------------------------------------- | :---------------------- | :----------------------------------- |
+| `PORT`                                 | `3000`                  | Server port.                         |
+| `PUBLIC_URL`                           | `http://localhost:port` | Public URL for download links.       |
+| `ENABLE_CORS`                          | `false`                 | Enable CORS.                         |
+| `CORS_ORIGIN`                          | `*`                     | Allowed CORS origin.                 |
+| `DEFAULT_SEARCH_ENGINES`               | `bing,duckduckgo,brave` | Default engines list.                |
+| `ENABLE_PROXY`                         | `false`                 | Enable proxy support.                |
+| `HTTP_PROXY`                           | -                       | HTTP Proxy URL.                      |
+| `HTTPS_PROXY`                          | -                       | HTTPS Proxy URL.                     |
+| `SOCKS5_PROXY`                         | -                       | SOCKS5 Proxy URL (Highest Priority). |
+| `SAMPLING`                             | `false`                 | Enable result sampling.              |
+| `SKIP_IDE_SAMPLING`                    | `false`                 | Prefer external API over IDE.        |
+| `LLM_BASE_URL`                         | -                       | External LLM API base URL.           |
+| `LLM_API_KEY`                          | -                       | External LLM API key.                |
+| `LLM_NAME`                             | -                       | External LLM model name.             |
+| `LLM_TIMEOUT_MS`                       | `30000`                 | Timeout for external LLM calls.      |
+| `DEEP_SEARCH_MAX_LOOPS`                | `20`                    | Max research iterations.             |
+| `DEEP_SEARCH_RESULTS_PER_ENGINE`       | `5`                     | Results per engine per round.        |
+| `DEEP_SEARCH_SATURATION_THRESHOLD`     | `0.6`                   | Threshold to stop research early.    |
+| `DEEP_SEARCH_MAX_CITATION_URLS`        | `10`                    | Max URLs to visit for citations.     |
+| `DEEP_SEARCH_REPORT_RETENTION_MINUTES` | `10`                    | Download expiration time (minutes).  |
+| `WRITE_DEBUG_TERMINAL`                 | `false`                 | Log debug output to stdout.          |
+| `WRITE_DEBUG_FILE`                     | `false`                 | Log debug output to file.            |
 
 ### CLI Arguments
 
@@ -331,8 +339,8 @@ Results are grouped by their canonical URL (protocol/www-agnostic hash).
 
 - **Deduplication**: Multiple entries for the same URL are merged.
 - **Scoring**: A `consensusScore` is calculated for each unique URL:
-  - **Inverted Rank Sum**: Individual ranks from engines are inverted ($1/rank$) and summed. This rewards higher placement across engines.
-  - **Engine Boost**: The sum is multiplied by the number of unique engines that found the URL. This rewards multi-provider agreement.
+  - **Inverted Rank Sum**: Sum of inverted ranks ($1/rank$) across engines. Higher placement results in a higher score.
+  - **Engine Boost**: Multiplies the sum by the number of unique engines that identified the URL. This prioritizes multi-provider agreement.
 - **Sorting**: The final list is sorted by the calculated `consensusScore` in descending order.
 
 ### 3. LLM Sampling (Optional)
@@ -359,9 +367,34 @@ When sampling is enabled, the server follows a tiered resolution logic to select
 > [!TIP]
 > You can use a model without API key, the `LLM_API_KEY` value is optional.
 
+> [!IMPORTANT]
+> **Deep Search Compatibility**: The `search_deep` tool strictly requires LLM capability (either via IDE or API). If neither is available, the tool will appear in the MCP list but will throw an error upon execution.
+
 ---
 
 ## Tools Documentation
+
+### `search_deep`
+
+Recursive research agent for deep investigation. Searches multiple sources, extracts citations, and synthesizes a comprehensive answer.
+
+**Requires LLM Sampling capability.**
+
+**Input:**
+
+```json
+{
+  "objective": "Deep research goal",
+  "max_loops": 3,
+  "results_per_engine": 5,
+  "max_citation_urls": 10,
+  "engines": ["bing", "brave"],
+  "attach_context": false
+}
+```
+
+**Output:**
+A structured Markdown report including a reference list. If configured, a **Download URL** at the top of the output permits downloading the results as a file.
 
 ### `search_web`
 
@@ -425,9 +458,20 @@ Returns current sampling status.
 
 ---
 
+## 📥 Ephemeral Downloads
+
+Deep Search results are served via an in-memory buffer cache.
+
+- **Storage**: Reports are stored as `Buffer` objects in the C++ heap to avoid V8 string memory limits.
+- **Expiration**: Each individual entry expires exactly **10 minutes** after creation. Access operations (`get`) do **not** extend the time-to-live (TTL).
+- **Memory Safety**: The cache is bounded by a **100MB ceiling**. When the limit is reached, a Least Recently Used (LRU) eviction policy removes the oldest entries.
+- **URL Configuration**: Link generation depends on the `PUBLIC_URL` variable to ensure accessible download endpoints in proxied environments.
+
+---
+
 ## Roadmap
 
-- [ ] **Deep Search**: Implement deeper search capabilities.
+- [x] **Deep Search**: Recursive research and synthesis engine.
 - [ ] **Keyless GitHub Adapter**: Implement adapter for GitHub content access.
 
 ---
