@@ -17,6 +17,8 @@ import { configureLogger } from "./utils/logger.js";
 import { mcpServer } from "./server/instance.js";
 import { getBuffer } from "./server/helpers/ephemeralBufferCache.js";
 
+import { AppConfig } from "./types/index.js";
+
 export { mcpServer };
 
 process.on("SIGTERM", async () => {
@@ -42,54 +44,12 @@ process.on("SIGHUP", async () => {
   process.exit(0);
 });
 
-async function main() {
-  program
-    .option("-p, --port <number>", "Port to listen on")
-    .option("-d, --debug", "Enable debug logging to stdout")
-    .option("--debug-file", "Enable debug logging to file")
-    .option("--cors", "Enable CORS")
-    .option("--proxy <url>", "Proxy URL")
-    .option(
-      "--engines <items>",
-      "Comma-separated list of search engines",
-      (value) => value.split(","),
-    )
-    .option("--sampling", "Enable sampling for search results (default)")
-    .option("--no-sampling", "Disable sampling for search results")
-    .parse();
-
-  const options = program.opts();
-
-  const overrides: ConfigOverrides = {
-    port: options.port ? parseInt(options.port, 10) : undefined,
-    debug: options.debug,
-    debugFile: options.debugFile,
-    cors: options.cors,
-    proxyUrl: options.proxy,
-    engines: options.engines,
-    sampling: options.sampling,
-  };
-
-  configureLogger({
-    writeToTerminal: overrides.debug,
-    writeToFile: overrides.debugFile,
-  });
-
-  await captureConsoleDebug();
-
+/**
+ * Creates and configures the Express application with MCP transport.
+ * Extracted for testability to allow verification of the server "contract".
+ */
+export function createApp(server: McpServer, appConfig: AppConfig) {
   const app = express();
-
-  // Initialize engine registry before registering tools
-  await initEngineRegistry();
-
-  // Initialize config with server capabilities and overrides (one-time setup)
-  const appConfig = setConfig(mcpServer, overrides);
-
-  serverInitializer(mcpServer);
-
-  // Configure logger based on the loaded configuration
-  // This is the CRITICAL STEP ensuring logger is ready before any heavy lifting
-  configureLogger(appConfig.logging);
 
   app.use(express.json());
 
@@ -119,10 +79,9 @@ async function main() {
         onsessioninitialized: (sessionId) => {
           transports.streamable[sessionId] = transport;
         },
-        // DNS rebinding protection is disabled by default for backwards compatibility. If you are running this server
-        // locally, make sure to set:
-        // enableDnsRebindingProtection: true,
-        // allowedHosts: ['127.0.0.1'],
+        enableDnsRebindingProtection:
+          appConfig.security.enableDnsRebindingProtection,
+        allowedHosts: appConfig.security.allowedHosts,
       });
 
       transport.onclose = () => {
@@ -131,7 +90,7 @@ async function main() {
         }
       };
 
-      await mcpServer.connect(transport);
+      await server.connect(transport);
     } else {
       res.status(400).json({
         jsonrpc: "2.0",
@@ -181,6 +140,58 @@ async function main() {
     );
     res.send(buffer);
   });
+
+  return app;
+}
+
+async function main() {
+  program
+    .option("-p, --port <number>", "Port to listen on")
+    .option("-d, --debug", "Enable debug logging to stdout")
+    .option("--debug-file", "Enable debug logging to file")
+    .option("--cors", "Enable CORS")
+    .option("--proxy <url>", "Proxy URL")
+    .option(
+      "--engines <items>",
+      "Comma-separated list of search engines",
+      (value) => value.split(","),
+    )
+    .option("--sampling", "Enable sampling for search results (default)")
+    .option("--no-sampling", "Disable sampling for search results")
+    .parse();
+
+  const options = program.opts();
+
+  const overrides: ConfigOverrides = {
+    port: options.port ? parseInt(options.port, 10) : undefined,
+    debug: options.debug,
+    debugFile: options.debugFile,
+    cors: options.cors,
+    proxyUrl: options.proxy,
+    engines: options.engines,
+    sampling: options.sampling,
+  };
+
+  configureLogger({
+    writeToTerminal: overrides.debug,
+    writeToFile: overrides.debugFile,
+  });
+
+  await captureConsoleDebug();
+
+  // Initialize engine registry before registering tools
+  await initEngineRegistry();
+
+  // Initialize config with server capabilities and overrides (one-time setup)
+  const appConfig = setConfig(mcpServer, overrides);
+
+  serverInitializer(mcpServer);
+
+  // Configure logger based on the loaded configuration
+  // This is the CRITICAL STEP ensuring logger is ready before any heavy lifting
+  configureLogger(appConfig.logging);
+
+  const app = createApp(mcpServer, appConfig);
 
   const PORT = appConfig.port;
   const transport = new StdioServerTransport();
