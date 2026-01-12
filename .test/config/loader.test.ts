@@ -278,4 +278,40 @@ describe("Config Loader", () => {
       expect(config.deepSearch.maxLoops).toBe(25);
     });
   });
+
+  describe("Security Config", () => {
+    it("should use default security values", () => {
+      resetConfigForTesting(false);
+      const config = getConfig();
+      expect(config.security.enableDnsRebindingProtection).toBe(false);
+      expect(config.security.allowedHosts).toEqual(["127.0.0.1", "localhost"]);
+    });
+
+    it("should allow overriding security settings via env vars", () => {
+      process.env.ENABLE_DNS_REBINDING_PROTECTION = "true";
+      process.env.ALLOWED_HOSTS = "example.com,internal.net";
+
+      resetConfigForTesting(false);
+      const config = getConfig();
+      expect(config.security.enableDnsRebindingProtection).toBe(true);
+      expect(config.security.allowedHosts).toEqual([
+        "example.com",
+        "internal.net",
+      ]);
+    });
+
+    it("should allow overriding security settings via CLI", () => {
+      const overrides: ConfigOverrides = {
+        security: {
+          enableDnsRebindingProtection: true,
+          allowedHosts: ["custom.host"],
+        },
+      };
+
+      resetConfigForTesting(false, overrides);
+      const config = getConfig();
+      expect(config.security.enableDnsRebindingProtection).toBe(true);
+      expect(config.security.allowedHosts).toEqual(["custom.host"]);
+    });
+  });
 });

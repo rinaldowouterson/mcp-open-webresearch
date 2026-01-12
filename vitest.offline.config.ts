@@ -19,6 +19,7 @@ export default defineConfig({
       ".test/server/helpers/executeMultiEngineSearch.test.ts",
       ".test/server/helpers/ephemeralBufferCache.test.ts",
       ".test/server/helpers/deepSearch/**/*.test.ts",
+      ".test/server/mcp_app.test.ts",
       ".test/security/**/*.test.ts",
       // Integration tests using local mock servers (mockttp, http.Server)
       ".test/engines/smart_fetch_mode.test.ts",
