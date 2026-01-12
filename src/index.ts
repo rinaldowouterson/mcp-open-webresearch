@@ -182,9 +182,11 @@ async function main() {
   });
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   // Ensure we attempt to log to the configured destination if possible,
   // otherwise fallback to stderr
   console.error("Fatal error:", error);
+  await cleanBrowserSession().catch(() => {});
+  await closeWritingStream().catch(() => {});
   process.exit(1);
 });
