@@ -6,5 +6,5 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
  */
 export const mcpServer = new McpServer({
   name: "open-webresearch",
-  version: "25.12.28",
+  version: "26.01.12",
 });
