@@ -241,6 +241,16 @@ const buildConfig = (
         overrides?.deepSearch?.reportRetentionMinutes ??
         parseInt(process.env.DEEP_SEARCH_REPORT_RETENTION_MINUTES || "10", 10),
     },
+    security: {
+      enableDnsRebindingProtection:
+        overrides?.security?.enableDnsRebindingProtection ??
+        process.env.ENABLE_DNS_REBINDING_PROTECTION === "true",
+      allowedHosts:
+        overrides?.security?.allowedHosts ??
+        (process.env.ALLOWED_HOSTS
+          ? process.env.ALLOWED_HOSTS.split(",").map((h) => h.trim())
+          : ["127.0.0.1", "localhost"]),
+    },
   };
 };
 

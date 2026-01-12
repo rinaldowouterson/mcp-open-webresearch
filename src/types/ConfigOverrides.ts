@@ -1,4 +1,4 @@
-import { DeepSearchConfig } from "./app-config.js";
+import { DeepSearchConfig, SecurityConfig } from "./app-config.js";
 
 export interface ConfigOverrides {
   debug?: boolean;
@@ -10,4 +10,5 @@ export interface ConfigOverrides {
   port?: number;
   sampling?: boolean;
   deepSearch?: Partial<DeepSearchConfig>;
+  security?: Partial<SecurityConfig>;
 }

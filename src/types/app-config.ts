@@ -97,4 +97,12 @@ export interface AppConfig {
 
   // Deep Search Configuration
   deepSearch: DeepSearchConfig;
+
+  // Security configuration
+  security: SecurityConfig;
+}
+
+export interface SecurityConfig {
+  enableDnsRebindingProtection: boolean;
+  allowedHosts: string[];
 }
