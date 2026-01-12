@@ -2,7 +2,10 @@ import fs from "fs/promises";
 import path from "path";
 import { format } from "util";
 
+// TODO:
+// HOW EARLY CAN WE
 const LOG_PATH_DEFAULT = "mcp-debug.log";
+
 // We default global logger config to strict safety: no output until configured.
 // This ensures that unit tests or scripts don't accidentally write logs unless they mean to.
 
