@@ -12,9 +12,20 @@ import socks5 from "simple-socks";
 import { ensureTestCerts } from "../utils/testCerts.js";
 
 // Helper to wait for the socks server to be ready
-const createSocksServer = (port: number, options: any = {}): Promise<any> => {
+const createSocksServer = (
+  port: number,
+  options: any = {},
+  trackedSockets: any[] = [],
+): Promise<any> => {
   return new Promise((resolve) => {
     const server = socks5.createServer(options);
+    server.on("proxyConnect", (info: any, socket: net.Socket) => {
+      trackedSockets.push(socket);
+      socket.on("close", () => {
+        const idx = trackedSockets.indexOf(socket);
+        if (idx !== -1) trackedSockets.splice(idx, 1);
+      });
+    });
     server.listen(port, "localhost", () => {
       resolve(server);
     });
@@ -24,6 +35,7 @@ const createSocksServer = (port: number, options: any = {}): Promise<any> => {
 const createHttpProxy = (
   port: number,
   onConnect: (url: string, headers: http.IncomingHttpHeaders) => void,
+  trackedSockets: any[] = [],
 ): Promise<http.Server> => {
   const proxy = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" });
@@ -36,6 +48,8 @@ const createHttpProxy = (
       const [hostname, portStr] = req.url.split(":");
       const port = parseInt(portStr, 10) || 443;
 
+      trackedSockets.push(clientSocket);
+
       const serverSocket = net.connect(port, hostname, () => {
         clientSocket.write(
           "HTTP/1.1 200 Connection Established\r\n" +
@@ -46,8 +60,17 @@ const createHttpProxy = (
         serverSocket.pipe(clientSocket);
         clientSocket.pipe(serverSocket);
       });
+
+      trackedSockets.push(serverSocket);
+
       serverSocket.on("error", (err) => {
-        console.error(`Local Proxy Upstream Error (${hostname}:${port}):`, err);
+        // Only log errors if the socket isn't being destroyed by us
+        if (clientSocket.writable) {
+          console.error(
+            `Local Proxy Upstream Error (${hostname}:${port}):`,
+            err,
+          );
+        }
         clientSocket.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
       });
 
@@ -57,6 +80,16 @@ const createHttpProxy = (
       clientSocket.on("error", () => {
         serverSocket.end();
       });
+
+      // Cleanup registry on close
+      const cleanup = () => {
+        [clientSocket, serverSocket].forEach((s) => {
+          const idx = trackedSockets.indexOf(s);
+          if (idx !== -1) trackedSockets.splice(idx, 1);
+        });
+      };
+      clientSocket.on("close", cleanup);
+      serverSocket.on("close", cleanup);
     }
   });
 
@@ -73,6 +106,7 @@ describe("Fetch Engines E2E Tests", () => {
   let proxyServer: mockttp.Mockttp | undefined;
   let customHttpProxy: http.Server | undefined;
   let socksServer: any;
+  let trackedSockets: any[] = [];
 
   const originalEnv = { ...process.env };
 
@@ -91,6 +125,8 @@ describe("Fetch Engines E2E Tests", () => {
     // Initialize LLM config after module reset
     const { resetConfigForTesting } = await import("../../src/config/index.js");
     resetConfigForTesting();
+
+    trackedSockets = [];
   });
 
   afterEach(async () => {
@@ -111,6 +147,12 @@ describe("Fetch Engines E2E Tests", () => {
       socksServer.close();
       socksServer = undefined;
     }
+
+    // Destroy all lingering connections
+    trackedSockets.forEach((s) => {
+      if (!s.destroyed) s.destroy();
+    });
+    trackedSockets = [];
   });
 
   it("should route Bing requests through an HTTP proxy", async () => {
@@ -154,11 +196,15 @@ describe("Fetch Engines E2E Tests", () => {
   it("should authenticate with HTTP proxy", async () => {
     const authHeaders: string[] = [];
 
-    customHttpProxy = await createHttpProxy(0, (url, headers) => {
-      if (headers["proxy-authorization"]) {
-        authHeaders.push(headers["proxy-authorization"] as string);
-      }
-    });
+    customHttpProxy = await createHttpProxy(
+      0,
+      (url, headers) => {
+        if (headers["proxy-authorization"]) {
+          authHeaders.push(headers["proxy-authorization"] as string);
+        }
+      },
+      trackedSockets,
+    );
 
     const username = "user123";
     const password = "password456";
@@ -208,7 +254,7 @@ describe("Fetch Engines E2E Tests", () => {
 
   it("should route Bing requests through a SOCKS5 proxy", async () => {
     const socksPort = 0; // 0 for random port
-    socksServer = await createSocksServer(socksPort);
+    socksServer = await createSocksServer(socksPort, {}, trackedSockets);
 
     let proxyConnected = false;
     socksServer.on("proxyConnect", () => {
@@ -305,22 +351,26 @@ describe("Fetch Engines E2E Tests", () => {
     let authAttempts = 0;
     let success = false;
 
-    socksServer = await createSocksServer(socksPort, {
-      authenticate: (
-        username: string,
-        password: string,
-        socket: any,
-        callback: (err?: Error) => void,
-      ) => {
-        authAttempts++;
-        if (username === "user123" && password === "pass456") {
-          success = true;
-          callback(); // Success
-        } else {
-          callback(new Error("Authentication failed"));
-        }
+    socksServer = await createSocksServer(
+      socksPort,
+      {
+        authenticate: (
+          username: string,
+          password: string,
+          socket: any,
+          callback: (err?: Error) => void,
+        ) => {
+          authAttempts++;
+          if (username === "user123" && password === "pass456") {
+            success = true;
+            callback(); // Success
+          } else {
+            callback(new Error("Authentication failed"));
+          }
+        },
       },
-    });
+      trackedSockets,
+    );
 
     const address = socksServer.address();
     const port = address.port;
@@ -353,6 +403,7 @@ describe("Fetch Engines E2E Tests", () => {
 describe("smartPost Proxy Tests", () => {
   let proxyServer: mockttp.Mockttp | undefined;
   let socksServer: any;
+  let trackedSockets: any[] = [];
 
   const originalEnv = { ...process.env };
 
@@ -370,6 +421,8 @@ describe("smartPost Proxy Tests", () => {
     // Initialize config after module reset
     const { resetConfigForTesting } = await import("../../src/config/index.js");
     resetConfigForTesting();
+
+    trackedSockets = [];
   });
 
   afterEach(async () => {
@@ -383,6 +436,11 @@ describe("smartPost Proxy Tests", () => {
       socksServer.close();
       socksServer = undefined;
     }
+    // Destroy all lingering connections
+    trackedSockets.forEach((s) => {
+      if (!s.destroyed) s.destroy();
+    });
+    trackedSockets = [];
     vi.restoreAllMocks();
   });
 
@@ -433,7 +491,7 @@ describe("smartPost Proxy Tests", () => {
 
   it("should route POST requests through a SOCKS5 proxy", async () => {
     const socksPort = 0; // Dynamic
-    socksServer = await createSocksServer(socksPort);
+    socksServer = await createSocksServer(socksPort, {}, trackedSockets);
 
     let proxyConnected = false;
     socksServer.on("proxyConnect", () => {
@@ -472,22 +530,26 @@ describe("smartPost Proxy Tests", () => {
     let authAttempts = 0;
     let success = false;
 
-    socksServer = await createSocksServer(socksPort, {
-      authenticate: (
-        username: string,
-        password: string,
-        socket: any,
-        callback: (err?: Error) => void,
-      ) => {
-        authAttempts++;
-        if (username === "apiuser" && password === "apipass") {
-          success = true;
-          callback();
-        } else {
-          callback(new Error("Authentication failed"));
-        }
+    socksServer = await createSocksServer(
+      socksPort,
+      {
+        authenticate: (
+          username: string,
+          password: string,
+          socket: any,
+          callback: (err?: Error) => void,
+        ) => {
+          authAttempts++;
+          if (username === "apiuser" && password === "apipass") {
+            success = true;
+            callback();
+          } else {
+            callback(new Error("Authentication failed"));
+          }
+        },
       },
-    });
+      trackedSockets,
+    );
 
     const address = socksServer.address();
     const port = address.port;
@@ -518,7 +580,7 @@ describe("smartPost Proxy Tests", () => {
   it("should NOT use proxy when proxy is disabled", async () => {
     // Create a SOCKS proxy that will fail the test if used
     const socksPort = 0;
-    socksServer = await createSocksServer(socksPort);
+    socksServer = await createSocksServer(socksPort, {}, trackedSockets);
 
     let proxyWasUsed = false;
     socksServer.on("proxyConnect", () => {
