@@ -114,8 +114,6 @@ async function callIdeSampling(
   return response.content.type === "text" ? response.content.text : "";
 }
 
-const RETRY_DELAYS = [5000, 25000, 60000];
-
 /**
  * Call LLM using the tiered resolution strategy with retry logic.
  */
@@ -124,6 +122,7 @@ export async function callLLM(
   server?: McpServer,
 ): Promise<LLMCallResult> {
   const { llm } = getConfig();
+  const retryDelays = llm.retryDelays;
   const effectiveServer = server || mcpServerRef;
 
   if (!llm.samplingAllowed) {
@@ -134,19 +133,19 @@ export async function callLLM(
 
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+  for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
     try {
       return await executeLLMStrategy(options, effectiveServer);
     } catch (error: any) {
       lastError = error;
 
-      // Determine if retry is possible (we just retry on all errors for now as requested)
-      if (attempt < RETRY_DELAYS.length) {
-        const delay = RETRY_DELAYS[attempt];
+      // Determine if retry is possible
+      if (attempt < retryDelays.length) {
+        const delay = retryDelays[attempt];
         console.warn(
           `[LLM] Call failed: ${error.message}. Retrying in ${
             delay / 1000
-          }s... (Attempt ${attempt + 1}/${RETRY_DELAYS.length})`,
+          }s... (Attempt ${attempt + 1}/${retryDelays.length})`,
         );
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
@@ -154,7 +153,7 @@ export async function callLLM(
   }
 
   throw new Error(
-    `All LLM attempts failed after ${RETRY_DELAYS.length} retries. Last error: ${lastError?.message}`,
+    `All LLM attempts failed after ${retryDelays.length} retries. Last error: ${lastError?.message}`,
   );
 }
 

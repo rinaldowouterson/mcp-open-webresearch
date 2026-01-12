@@ -28,6 +28,8 @@ export interface LlmConfig {
   model: string | null;
   /** Timeout in milliseconds for LLM API calls (LLM_TIMEOUT_MS, default: 30000) */
   timeoutMs: number;
+  /** Delays in milliseconds for retrying LLM calls (default: [5000, 25000, 60000]) */
+  retryDelays: number[];
   /** Skip IDE sampling and prefer external API (SKIP_IDE_SAMPLING) */
   skipIdeSampling: boolean;
   /** Whether external API sampling is available */
@@ -52,6 +54,15 @@ export interface DeepSearchConfig {
   maxCitationUrls: number;
   /** Report retention time in minutes (default: 10) */
   reportRetentionMinutes: number;
+}
+
+export interface BrowserConfig {
+  /** Maximum number of parallel citation extractions (default: 4) */
+  concurrency: number;
+  /** Time in milliseconds to keep browser open after last activity (default: 5 minutes) */
+  idleTimeout: number;
+  /** Maximum allowed size for screenshots in bytes (default: 5MB) */
+  screenshotMaxSize: number;
 }
 
 export interface AppConfig {
@@ -97,6 +108,9 @@ export interface AppConfig {
 
   // Deep Search Configuration
   deepSearch: DeepSearchConfig;
+
+  // Browser behavior configuration
+  browser: BrowserConfig;
 
   // Security configuration
   security: SecurityConfig;

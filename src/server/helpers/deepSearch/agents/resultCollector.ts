@@ -1,12 +1,6 @@
-/**
- * ResultCollector Agent
- *
- * Executes search queries and collects results.
- * This is a pure function with no LLM calls.
- */
-
 import { executeMultiEngineSearch } from "../../executeMultiEngineSearch.js";
 import { getConfig } from "../../../../config/index.js";
+import { normalizeUrlForDedup } from "../../../../utils/url.js";
 import type { MergedSearchResult } from "../../../../types/MergedSearchResult.js";
 import type { QueryEntry } from "../contextSheet.js";
 
@@ -29,12 +23,7 @@ function deduplicateByUrl(results: MergedSearchResult[]): MergedSearchResult[] {
   const unique: MergedSearchResult[] = [];
 
   for (const result of results) {
-    // Normalize URL for deduplication
-    const normalizedUrl = result.url
-      .toLowerCase()
-      .replace(/^https?:\/\//, "")
-      .replace(/^www\./, "")
-      .replace(/\/$/, "");
+    const normalizedUrl = normalizeUrlForDedup(result.url);
 
     if (!seen.has(normalizedUrl)) {
       seen.add(normalizedUrl);

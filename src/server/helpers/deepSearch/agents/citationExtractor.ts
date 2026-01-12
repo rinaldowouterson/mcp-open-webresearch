@@ -7,6 +7,8 @@
 
 import { visitPage } from "../../../../engines/visit_page/visit.js";
 import { callLLM } from "../../callLLM.js";
+import { getConfig } from "../../../../config/index.js";
+import { normalizeUrlForDedup } from "../../../../utils/url.js";
 import {
   CITATION_EXTRACTOR_SYSTEM_PROMPT,
   buildCitationExtractorUserPrompt,
@@ -212,11 +214,11 @@ export async function executeCitationExtractor(
     `[CitationExtractor] Processing ${urlsToVisit.length} URLs for citations`,
   );
 
+  // Parallel processing with concurrency limit from configuration
+  const CONCURRENCY = getConfig().browser.concurrency;
+
   // Progress batching: collect citations per URL for batched progress reports
   let progressBatch: { url: string; count: number }[] = [];
-
-  // Parallel processing with concurrency limit
-  const CONCURRENCY = 4;
 
   // Helper to process a single URL
   async function processUrl(
@@ -257,7 +259,7 @@ export async function executeCitationExtractor(
           },
           visited: true,
           failed: false,
-          progressItem: { url: new URL(result.url).hostname, count: 0 },
+          progressItem: { url: normalizeUrlForDedup(result.url), count: 0 },
         };
       }
 
@@ -272,7 +274,7 @@ export async function executeCitationExtractor(
         return {
           visited: false,
           failed: false,
-          progressItem: { url: new URL(result.url).hostname, count: 0 },
+          progressItem: { url: normalizeUrlForDedup(result.url), count: 0 },
         };
       }
 
@@ -384,7 +386,7 @@ export async function executeCitationExtractor(
         visited: true,
         failed: false,
         progressItem: {
-          url: new URL(result.url).hostname,
+          url: normalizeUrlForDedup(result.url),
           count: verified.length,
         },
       };
@@ -395,7 +397,7 @@ export async function executeCitationExtractor(
       return {
         visited: false,
         failed: true,
-        progressItem: { url: new URL(result.url).hostname, count: 0 },
+        progressItem: { url: normalizeUrlForDedup(result.url), count: 0 },
       };
     }
   }

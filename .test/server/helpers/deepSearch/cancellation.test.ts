@@ -33,8 +33,17 @@ function createMockConfig(): Partial<AppConfig> {
       resultsPerEngine: 3,
       saturationThreshold: 0.6,
       maxCitationUrls: 10,
+      reportRetentionMinutes: 10,
     },
     defaultSearchEngines: ["mock"],
+    browser: {
+      concurrency: 4,
+      idleTimeout: 300000,
+      screenshotMaxSize: 5242880,
+    },
+    llm: {
+      retryDelays: [1000, 2000],
+    } as any,
   };
 }
 
