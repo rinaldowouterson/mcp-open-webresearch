@@ -79,6 +79,7 @@ describe("Fetch Layer", () => {
       const mockSmartFetch = vi.fn().mockResolvedValue("<html>bing</html>");
       vi.doMock("../../src/engines/fetch/client.js", () => ({
         smartFetch: mockSmartFetch,
+        resetClients: vi.fn(),
       }));
       // Also need to re-mock config because import chain might reload it
       mockLoadConfig.mockReturnValue({ proxy: { enabled: false }, ssl: {} });
@@ -97,6 +98,7 @@ describe("Fetch Layer", () => {
       const mockSmartFetch = vi.fn().mockResolvedValue("<html>ddg</html>");
       vi.doMock("../../src/engines/fetch/client.js", () => ({
         smartFetch: mockSmartFetch,
+        resetClients: vi.fn(),
       }));
       mockLoadConfig.mockReturnValue({ proxy: { enabled: false }, ssl: {} });
 
@@ -114,6 +116,7 @@ describe("Fetch Layer", () => {
       const mockSmartFetch = vi.fn().mockResolvedValue("<html>brave</html>");
       vi.doMock("../../src/engines/fetch/client.js", () => ({
         smartFetch: mockSmartFetch,
+        resetClients: vi.fn(),
       }));
       mockLoadConfig.mockReturnValue({ proxy: { enabled: false }, ssl: {} });
 

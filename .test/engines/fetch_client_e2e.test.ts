@@ -103,6 +103,7 @@ describe("Fetch Engines E2E Tests", () => {
       proxyServer = undefined;
     }
     if (customHttpProxy) {
+      customHttpProxy.closeAllConnections();
       customHttpProxy.close();
       customHttpProxy = undefined;
     }

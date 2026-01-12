@@ -393,6 +393,7 @@ describe("Direct API Sampling (External LLM)", () => {
 
     vi.doMock("../../src/engines/fetch/client.js", () => ({
       smartPost: mockSmartPost,
+      resetClients: vi.fn(),
     }));
 
     // Initialize config after module reset
@@ -481,6 +482,7 @@ describe("Direct API Sampling (External LLM)", () => {
 
     vi.doMock("../../src/engines/fetch/client.js", () => ({
       smartPost: mockSmartPost,
+      resetClients: vi.fn(),
     }));
 
     // Initialize config after module reset
@@ -532,6 +534,7 @@ describe("Direct API Sampling (External LLM)", () => {
 
     vi.doMock("../../src/engines/fetch/client.js", () => ({
       smartPost: mockSmartPost,
+      resetClients: vi.fn(),
     }));
 
     // Initialize config with IDE support for fallback
