@@ -24,9 +24,12 @@ export function getUrlHash(url: string): string {
  * - Original rank positions are inverted (1/rank) and summed to remove bias
  *   (e.g., rank 1 from Bing + rank 3 from Brave = 1/1 + 1/3 = 1.33).
  * - The final score is multiplied by the number of engines for consensus boost.
+ * - Titles are selected based on Majority Vote (most frequent title wins).
+ *   Tie-break: Longest title used.
  */
 export function mergeSearchResults(
   results: SearchResult[],
+  query?: string,
 ): MergedSearchResult[] {
   const hashMap = new Map<
     string,
@@ -66,10 +69,24 @@ export function mergeSearchResults(
   const merged: MergedSearchResult[] = [];
 
   for (const [hash, data] of hashMap.entries()) {
-    // Heuristic champion: longest title and description
-    const bestTitle = data.titles.reduce((a, b) =>
-      a.length >= b.length ? a : b,
+    // 1. Title Selection: Majority Vote
+    const titleCounts = data.titles.reduce(
+      (acc, title) => {
+        acc[title] = (acc[title] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
     );
+
+    // Find title with max votes. Tie-break: Longest title.
+    const bestTitle = Object.keys(titleCounts).reduce((a, b) => {
+      if (titleCounts[a] > titleCounts[b]) return a;
+      if (titleCounts[b] > titleCounts[a]) return b;
+      // Tie-break: length
+      return a.length >= b.length ? a : b;
+    });
+
+    // 2. Description Selection: Longest description (simple heuristic for now)
     const bestDescription = data.descriptions.reduce((a, b) =>
       a.length >= b.length ? a : b,
     );

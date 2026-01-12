@@ -93,7 +93,7 @@ export const executeMultiEngineSearch = async (
 
   // Merge and rank results by consensus
   // The merge logic handles deduplication properly
-  const mergedResults = mergeSearchResults(successfulResults);
+  const mergedResults = mergeSearchResults(successfulResults, cleanQuery);
 
   return mergedResults;
 };
