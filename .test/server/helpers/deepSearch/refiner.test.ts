@@ -14,6 +14,7 @@ function createMockConfig(): Partial<AppConfig> {
       resultsPerEngine: 3,
       saturationThreshold: 0.6,
       maxCitationUrls: 10,
+      reportRetentionMinutes: 10,
     },
   };
 }
