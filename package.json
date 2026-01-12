@@ -21,7 +21,11 @@
     "test:infrastructure": "NODE_ENV=test vitest run -c vitest.infra.config.ts",
     "test:offline": "NODE_ENV=test vitest run -c vitest.offline.config.ts",
     "test:online": "NODE_ENV=test vitest run -c vitest.online.config.ts",
-    "generate-certs": "npm run build && node build/scripts/generate-test-certs.js"
+    "generate-certs": "npm run build && node build/scripts/generate-test-certs.js",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\""
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.11.2",
@@ -40,12 +44,16 @@
     "turndown": "^7.2.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
     "@types/jsdom": "^21.1.7",
+    "eslint": "^9.39.2",
     "mockttp": "^3.10.0",
+    "prettier": "^3.7.4",
     "simple-socks": "^3.2.0",
     "typescript": "^5.3.3",
+    "typescript-eslint": "^8.52.0",
     "vitest": "^3.2.4"
   }
 }
