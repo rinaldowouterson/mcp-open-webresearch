@@ -27,6 +27,7 @@ Decide CONTINUE when:
 - Critical aspects of the objective remain unanswered
 - Too few quality sources (mostly LOW/REJECTED)
 - Obvious gaps that could be filled with targeted queries
+- Budget is high (many loops remaining) and quality can be improved
 
 ## FEEDBACK RULES (only if CONTINUE)
 - Be specific about what's missing
@@ -40,8 +41,18 @@ Return ONLY the JSON object, no markdown fencing.`;
  * Build the user prompt for Refiner.
  * Shows the rendered ContextSheet for evaluation.
  */
-export function buildRefinerUserPrompt(renderedSheet: string): string {
+export function buildRefinerUserPrompt(
+  renderedSheet: string,
+  currentLoop: number,
+  maxLoops: number,
+): string {
+  const loopsRemaining = maxLoops - currentLoop;
   return `Evaluate the current research state and decide if more research is needed.
+
+## Budget Status
+- Current Round: ${currentLoop}
+- Max Rounds: ${maxLoops}
+- Rounds Remaining: ${loopsRemaining}
 
 ${renderedSheet}
 

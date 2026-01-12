@@ -144,7 +144,11 @@ export async function executeRefiner(
   // 3. LLM evaluation
   console.debug("[Refiner] Consulting LLM for decision");
   const renderedSheet = renderContextSheet(sheet);
-  const userPrompt = buildRefinerUserPrompt(renderedSheet);
+  const userPrompt = buildRefinerUserPrompt(
+    renderedSheet,
+    currentLoop,
+    maxLoops,
+  );
 
   try {
     const llmResult = await callLLM({
