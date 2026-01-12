@@ -13,6 +13,7 @@ export default defineConfig({
       ".test/config/**/*.test.ts",
       ".test/engines/*_unit.test.ts",
       ".test/engines/bing_url_resolution.test.ts",
+      ".test/engines/screenshot_resizing_e2e.test.ts",
       ".test/engines/throttle.test.ts",
       ".test/utils/**/*.test.ts",
       ".test/isValidUrl.test.ts",
@@ -25,6 +26,7 @@ export default defineConfig({
       // Integration tests using local mock servers (mockttp, http.Server)
       ".test/engines/smart_fetch_mode.test.ts",
       ".test/engines/playwright_visit_e2e.test.ts",
+      ".test/engines/screenshot_resizing_e2e.test.ts",
       ".test/engines/fetch_client_e2e.test.ts",
     ],
     exclude: ["**/*.infra.test.ts", "node_modules", "build"],

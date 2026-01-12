@@ -106,15 +106,21 @@ const clientSupportsSampling = (server: McpServer): boolean => {
  *
  * @param ideSupportsSampling - Whether the IDE supports sampling (from server or mocked)
  */
-const buildLlmConfigFromParams = (ideSupportsSampling: boolean): LlmConfig => {
-  const baseUrl = process.env.LLM_BASE_URL || null;
-  const apiKey = process.env.LLM_API_KEY || null;
-  const model = process.env.LLM_NAME || null;
+const buildLlmConfigFromParams = (
+  ideSupportsSampling: boolean,
+  overrides?: ConfigOverrides,
+): LlmConfig => {
+  const baseUrl = overrides?.llm?.baseUrl || process.env.LLM_BASE_URL || null;
+  const apiKey = overrides?.llm?.apiKey || process.env.LLM_API_KEY || null;
+  const model = overrides?.llm?.model || process.env.LLM_NAME || null;
   const apiSamplingAvailable = !!baseUrl && !!model;
 
   const skipIdeSampling =
+    overrides?.llm?.skipIdeSampling ??
     process.env.SKIP_IDE_SAMPLING?.toLowerCase() === "true";
-  const samplingEnabled = process.env.SAMPLING?.toLowerCase() === "true";
+
+  const samplingEnabled =
+    overrides?.sampling ?? process.env.SAMPLING?.toLowerCase() === "true";
 
   // Logic based on README.md priority table:
   // Sampling is allowed if SAMPLING=true AND (IDE available OR API available)
@@ -122,7 +128,9 @@ const buildLlmConfigFromParams = (ideSupportsSampling: boolean): LlmConfig => {
     samplingEnabled &&
     ((ideSupportsSampling && !skipIdeSampling) || apiSamplingAvailable);
 
-  const timeoutMs = parseInt(process.env.LLM_TIMEOUT_MS || "30000", 10);
+  const timeoutMs =
+    overrides?.llm?.timeoutMs ||
+    parseInt(process.env.LLM_TIMEOUT_MS || "30000", 10);
 
   if (samplingEnabled && !ideSupportsSampling && !apiSamplingAvailable) {
     console.debug(
@@ -162,6 +170,11 @@ const buildLlmConfigFromParams = (ideSupportsSampling: boolean): LlmConfig => {
     apiSelectedButIdeAvailable,
     useApiFirst,
     useIdeFirst,
+    retryDelays:
+      overrides?.llm?.retryDelays ||
+      (process.env.LLM_RETRY_DELAYS
+        ? process.env.LLM_RETRY_DELAYS.split(",").map((d) => parseInt(d, 10))
+        : [5000, 25000, 60000]),
   };
 };
 
@@ -190,7 +203,8 @@ const buildConfig = (
   const isDocker = process.env.DOCKER_ENVIRONMENT === "true";
   const chromiumPath = process.env.CHROMIUM_EXECUTABLE_PATH;
 
-  const logPath = process.env.MCP_LOG_PATH || "mcp-debug.log";
+  const logPath =
+    overrides?.logPath || process.env.MCP_LOG_PATH || "mcp-debug.log";
 
   return {
     port:
@@ -206,9 +220,11 @@ const buildConfig = (
     defaultSearchEngines,
     proxy: loadProxyConfig(overrides),
     enableCors,
-    corsOrigin: process.env.CORS_ORIGIN || "*",
+    corsOrigin: overrides?.corsOrigin || process.env.CORS_ORIGIN || "*",
     ssl: {
-      ignoreTlsErrors: process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0",
+      ignoreTlsErrors:
+        overrides?.ssl?.ignoreTlsErrors ??
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0",
     },
     docker: {
       isDocker,
@@ -222,8 +238,10 @@ const buildConfig = (
       writeToFile:
         !!overrides?.debugFile || process.env.WRITE_DEBUG_FILE === "true",
     },
-    llm: buildLlmConfigFromParams(ideSupportsSampling),
-    skipCooldown: process.env.SKIP_COOLDOWN?.toLowerCase() === "true",
+    llm: buildLlmConfigFromParams(ideSupportsSampling, overrides),
+    skipCooldown:
+      overrides?.skipCooldown ??
+      process.env.SKIP_COOLDOWN?.toLowerCase() === "true",
     deepSearch: {
       maxLoops:
         overrides?.deepSearch?.maxLoops ??
@@ -240,6 +258,23 @@ const buildConfig = (
       reportRetentionMinutes:
         overrides?.deepSearch?.reportRetentionMinutes ??
         parseInt(process.env.DEEP_SEARCH_REPORT_RETENTION_MINUTES || "10", 10),
+    },
+    browser: {
+      concurrency:
+        overrides?.browser?.concurrency ??
+        parseInt(process.env.BROWSER_CONCURRENCY || "4", 10),
+      idleTimeout:
+        overrides?.browser?.idleTimeout ??
+        parseInt(
+          process.env.BROWSER_IDLE_TIMEOUT_MS || String(5 * 60 * 1000),
+          10,
+        ),
+      screenshotMaxSize:
+        overrides?.browser?.screenshotMaxSize ??
+        parseInt(
+          process.env.BROWSER_SCREENSHOT_MAX_SIZE || String(5 * 1024 * 1024),
+          10,
+        ),
     },
     security: {
       enableDnsRebindingProtection:
