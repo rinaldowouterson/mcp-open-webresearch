@@ -5,7 +5,6 @@ export type {
   AppConfig,
   ProxyConfig,
   ProxyProtocol,
-  ProxyAgent,
   LlmConfig,
 } from "./app-config.js";
 

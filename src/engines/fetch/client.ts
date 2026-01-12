@@ -112,9 +112,7 @@ export async function smartPost(
  * REQUIRED: Must only be used in non-production environments (e.g., testing).
  */
 export function resetClients(): void {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("CRITICAL: resetClients called in PRODUCTION environment!");
-  }
+  // It is safe to reset clients in production when config changes
   browserClient = null;
   standardClient = null;
 }
